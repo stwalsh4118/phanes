@@ -38,7 +38,7 @@ func SetDryRun(enabled bool) {
 	mu.Lock()
 	defer mu.Unlock()
 	dryRun = enabled
-	updateLogger()
+	updateLoggerUnlocked()
 }
 
 // isDryRun returns the current dry-run mode state in a thread-safe manner.
@@ -62,11 +62,10 @@ func getStderr() io.Writer {
 	return stderr
 }
 
-// updateLogger updates the logger instance with current settings.
-func updateLogger() {
-	mu.RLock()
-	defer mu.RUnlock()
-
+// updateLoggerUnlocked updates the logger instance with current settings.
+// This function must be called while holding the appropriate lock on mu.
+// It does not acquire any locks itself.
+func updateLoggerUnlocked() {
 	output := zerolog.ConsoleWriter{
 		Out:        getStdout(),
 		NoColor:    false,
@@ -79,6 +78,14 @@ func updateLogger() {
 	}
 
 	logger = log
+}
+
+// updateLogger updates the logger instance with current settings.
+// This function acquires a read lock on mu before updating.
+func updateLogger() {
+	mu.RLock()
+	defer mu.RUnlock()
+	updateLoggerUnlocked()
 }
 
 // Info logs an informational message to stdout.

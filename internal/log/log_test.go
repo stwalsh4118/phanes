@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // setStdoutForTesting sets the stdout writer for testing purposes.
@@ -43,6 +44,30 @@ func TestSetDryRun(t *testing.T) {
 	SetDryRun(false)
 	if isDryRun() {
 		t.Error("Expected dry-run to be disabled")
+	}
+}
+
+// TestSetDryRunNoDeadlock verifies that SetDryRun doesn't deadlock when called.
+// This test would hang indefinitely if the deadlock bug exists.
+func TestSetDryRunNoDeadlock(t *testing.T) {
+	// This test verifies the fix for the deadlock where SetDryRun() holds a write lock
+	// and calls updateLogger() which tries to acquire a read lock on the same mutex.
+	// If the deadlock exists, this test will hang.
+	done := make(chan bool)
+	go func() {
+		// Call SetDryRun multiple times to ensure no deadlock
+		SetDryRun(true)
+		SetDryRun(false)
+		SetDryRun(true)
+		SetDryRun(false)
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// Success - no deadlock
+	case <-time.After(2 * time.Second):
+		t.Fatal("Deadlock detected: SetDryRun() hung indefinitely")
 	}
 }
 
@@ -92,8 +117,9 @@ func TestError(t *testing.T) {
 	if !strings.Contains(output, "something went wrong") {
 		t.Error("Expected output to contain 'something went wrong'")
 	}
-	if !strings.Contains(strings.ToLower(output), "error") {
-		t.Error("Expected output to contain error level")
+	// Zerolog console writer outputs "ERR" for error level, which becomes "err" when lowercased
+	if !strings.Contains(strings.ToLower(output), "err") {
+		t.Error("Expected output to contain error level (ERR)")
 	}
 }
 
