@@ -27,12 +27,13 @@ This is the user-facing interface of the entire system.
 ## Technical Approach
 
 ### CLI (main.go)
-- Use `flag` package for command-line arguments
+- Use Cobra CLI framework for structured command handling
 - Support `--profile` flag for profile selection
 - Support `--modules` flag for module selection (comma-separated)
 - Support `--config` flag for config file path
 - Support `--dry-run` flag for preview mode
 - Support `--list` flag to show available modules/profiles
+- Automatic help text generation via Cobra
 
 ### Profile Integration
 - Load profiles from profile package
