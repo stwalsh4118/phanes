@@ -13,7 +13,6 @@ const (
 )
 
 var (
-	logger   zerolog.Logger
 	dryRun   bool
 	mu       sync.RWMutex
 	stdout   io.Writer = os.Stdout
@@ -22,23 +21,12 @@ var (
 	stderrMu sync.RWMutex
 )
 
-func init() {
-	// Initialize logger with console writer for colored output
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		NoColor:    false,
-		TimeFormat: "15:04:05",
-	}
-	logger = zerolog.New(output).With().Timestamp().Logger()
-}
-
 // SetDryRun sets the dry-run mode flag. When enabled, all log messages
 // will include a dry_run field set to true.
 func SetDryRun(enabled bool) {
 	mu.Lock()
 	defer mu.Unlock()
 	dryRun = enabled
-	updateLoggerUnlocked()
 }
 
 // isDryRun returns the current dry-run mode state in a thread-safe manner.
@@ -62,10 +50,9 @@ func getStderr() io.Writer {
 	return stderr
 }
 
-// updateLoggerUnlocked updates the logger instance with current settings.
-// This function must be called while holding the appropriate lock on mu.
-// It does not acquire any locks itself.
-func updateLoggerUnlocked() {
+// Info logs an informational message to stdout.
+func Info(format string, args ...interface{}) {
+	// Create logger with current settings (thread-safe)
 	output := zerolog.ConsoleWriter{
 		Out:        getStdout(),
 		NoColor:    false,
@@ -73,31 +60,32 @@ func updateLoggerUnlocked() {
 	}
 	log := zerolog.New(output).With().Timestamp().Logger()
 
+	mu.RLock()
 	if dryRun {
 		log = log.With().Bool(dryRunField, true).Logger()
 	}
+	mu.RUnlock()
 
-	logger = log
-}
-
-// updateLogger updates the logger instance with current settings.
-// This function acquires a read lock on mu before updating.
-func updateLogger() {
-	mu.RLock()
-	defer mu.RUnlock()
-	updateLoggerUnlocked()
-}
-
-// Info logs an informational message to stdout.
-func Info(format string, args ...interface{}) {
-	updateLogger()
-	logger.Info().Msgf(format, args...)
+	log.Info().Msgf(format, args...)
 }
 
 // Success logs a success message to stdout at info level with a success field.
 func Success(format string, args ...interface{}) {
-	updateLogger()
-	logger.Info().Bool("success", true).Msgf(format, args...)
+	// Create logger with current settings (thread-safe)
+	output := zerolog.ConsoleWriter{
+		Out:        getStdout(),
+		NoColor:    false,
+		TimeFormat: "15:04:05",
+	}
+	log := zerolog.New(output).With().Timestamp().Logger()
+
+	mu.RLock()
+	if dryRun {
+		log = log.With().Bool(dryRunField, true).Logger()
+	}
+	mu.RUnlock()
+
+	log.Info().Bool("success", true).Msgf(format, args...)
 }
 
 // Error logs an error message to stderr.
@@ -121,12 +109,38 @@ func Error(format string, args ...interface{}) {
 
 // Skip logs a skip message to stdout at info level with a skip field.
 func Skip(format string, args ...interface{}) {
-	updateLogger()
-	logger.Info().Bool("skip", true).Msgf(format, args...)
+	// Create logger with current settings (thread-safe)
+	output := zerolog.ConsoleWriter{
+		Out:        getStdout(),
+		NoColor:    false,
+		TimeFormat: "15:04:05",
+	}
+	log := zerolog.New(output).With().Timestamp().Logger()
+
+	mu.RLock()
+	if dryRun {
+		log = log.With().Bool(dryRunField, true).Logger()
+	}
+	mu.RUnlock()
+
+	log.Info().Bool("skip", true).Msgf(format, args...)
 }
 
 // Warn logs a warning message to stdout.
 func Warn(format string, args ...interface{}) {
-	updateLogger()
-	logger.Warn().Msgf(format, args...)
+	// Create logger with current settings (thread-safe)
+	output := zerolog.ConsoleWriter{
+		Out:        getStdout(),
+		NoColor:    false,
+		TimeFormat: "15:04:05",
+	}
+	log := zerolog.New(output).With().Timestamp().Logger()
+
+	mu.RLock()
+	if dryRun {
+		log = log.With().Bool(dryRunField, true).Logger()
+	}
+	mu.RUnlock()
+
+	log.Warn().Msgf(format, args...)
 }
