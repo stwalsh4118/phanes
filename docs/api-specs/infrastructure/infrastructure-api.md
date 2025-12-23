@@ -152,3 +152,162 @@ if err := exec.WriteFile("/tmp/test.txt", content, 0644); err != nil {
 
 - Standard library only (`os`, `os/exec`)
 
+## Config Package
+
+Package: `github.com/stwalsh4118/phanes/internal/config`
+
+Provides YAML configuration loading, parsing, validation, and sensible defaults for all Phanes module settings.
+
+### Public Types
+
+```go
+// Config represents the complete configuration structure for Phanes.
+type Config struct {
+    User     User     `yaml:"user"`
+    System   System   `yaml:"system"`
+    Swap     Swap     `yaml:"swap"`
+    Security Security `yaml:"security"`
+    Docker   Docker   `yaml:"docker"`
+    Postgres Postgres `yaml:"postgres"`
+    Redis    Redis    `yaml:"redis"`
+    Nginx    Nginx    `yaml:"nginx"`
+    Caddy    Caddy    `yaml:"caddy"`
+    DevTools DevTools `yaml:"devtools"`
+    Coolify  Coolify  `yaml:"coolify"`
+}
+
+// User contains user-related configuration.
+type User struct {
+    Username     string `yaml:"username"`
+    SSHPublicKey string `yaml:"ssh_public_key"`
+}
+
+// System contains system-level configuration.
+type System struct {
+    Timezone string `yaml:"timezone"`
+}
+
+// Swap contains swap file configuration.
+type Swap struct {
+    Enabled bool   `yaml:"enabled"`
+    Size    string `yaml:"size"`
+}
+
+// Security contains security-related configuration.
+type Security struct {
+    SSHPort           int  `yaml:"ssh_port"`
+    AllowPasswordAuth bool `yaml:"allow_password_auth"`
+}
+
+// Docker contains Docker-related configuration.
+type Docker struct {
+    InstallCompose bool `yaml:"install_compose"`
+}
+
+// Postgres contains PostgreSQL configuration.
+type Postgres struct {
+    Version  string `yaml:"version"`
+    Password string `yaml:"password"`
+}
+
+// Redis contains Redis configuration.
+type Redis struct {
+    Password string `yaml:"password"`
+}
+
+// Nginx contains Nginx configuration.
+type Nginx struct {
+    Enabled bool `yaml:"enabled"`
+}
+
+// Caddy contains Caddy configuration.
+type Caddy struct {
+    Enabled bool `yaml:"enabled"`
+}
+
+// DevTools contains development tools configuration.
+type DevTools struct {
+    NodeVersion   string `yaml:"node_version"`
+    PythonVersion string `yaml:"python_version"`
+    GoVersion     string `yaml:"go_version"`
+}
+
+// Coolify contains Coolify configuration.
+type Coolify struct {
+    Enabled bool `yaml:"enabled"`
+}
+```
+
+### Public Functions
+
+```go
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() *Config
+
+// Load reads and parses a YAML configuration file, applies defaults, and validates it.
+// Returns the parsed Config and an error if loading, parsing, or validation fails.
+func Load(path string) (*Config, error)
+
+// Validate checks that all required fields in the Config are set.
+// Returns an error if any required field is missing or empty.
+func Validate(cfg *Config) error
+```
+
+### Usage Examples
+
+```go
+import "github.com/stwalsh4118/phanes/internal/config"
+
+// Load configuration from file
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Access configuration values
+log.Info("Username: %s", cfg.User.Username)
+log.Info("Timezone: %s", cfg.System.Timezone)
+
+// Validate existing config
+if err := config.Validate(cfg); err != nil {
+    log.Error("Invalid config: %v", err)
+}
+
+// Get default configuration
+defaultCfg := config.DefaultConfig()
+```
+
+### Default Values
+
+- **System.Timezone**: `"UTC"`
+- **Swap.Enabled**: `true`
+- **Swap.Size**: `"2G"`
+- **Security.SSHPort**: `22`
+- **Security.AllowPasswordAuth**: `false`
+- **Docker.InstallCompose**: `true`
+- **Postgres.Version**: `"16"`
+- **DevTools.NodeVersion**: `"20"`
+- **DevTools.PythonVersion**: `"3.12"`
+- **DevTools.GoVersion**: `"1.25"`
+- **Nginx.Enabled**: `false`
+- **Caddy.Enabled**: `false`
+- **Coolify.Enabled**: `false`
+
+### Required Fields
+
+- `user.username` - Username for the deployment user
+- `user.ssh_public_key` - SSH public key for the deployment user
+
+### Behavior
+
+- **YAML Parsing**: Uses `gopkg.in/yaml.v3` for YAML parsing
+- **Defaults**: Missing optional fields are automatically filled with sensible defaults
+- **Validation**: Required fields are validated after loading and applying defaults
+- **Error Messages**: Validation errors clearly indicate which field is missing
+- **File Reading**: Uses `os.ReadFile` to read configuration files
+
+### Dependencies
+
+- `gopkg.in/yaml.v3` v3.0.1
+
