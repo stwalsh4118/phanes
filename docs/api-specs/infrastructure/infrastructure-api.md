@@ -143,6 +143,7 @@ if err := exec.WriteFile("/tmp/test.txt", content, 0644); err != nil {
 
 - **Error Handling**: All functions return errors appropriately; no panics
 - **Command Execution**: Uses `os/exec` package for safe command execution
+- **Output Capture**: `RunWithOutput()` captures stdout only; stderr is not captured and will be written to the process's stderr
 - **File Operations**: Uses `os` package for file system operations
 - **Idempotency**: FileExists and CommandExists are safe to call multiple times
 - **Permissions**: WriteFile respects the provided file mode (Unix-like systems)
