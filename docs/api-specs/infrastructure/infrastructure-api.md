@@ -468,3 +468,116 @@ runner.RegisterModule(&BaselineModule{})
 
 - `github.com/stwalsh4118/phanes/internal/config` - For configuration access
 
+## Runner Package
+
+Package: `github.com/stwalsh4118/phanes/internal/runner`
+
+Manages a registry of modules and executes them in order with proper error handling and idempotency checks. The runner ensures modules are only installed if they're not already installed, and supports dry-run mode for previewing actions.
+
+### Public Types
+
+```go
+// Runner manages a registry of modules and executes them in order.
+type Runner struct {
+    // modules is a map of module names to Module instances
+    modules map[string]module.Module
+}
+```
+
+### Public Functions
+
+```go
+// NewRunner creates a new Runner instance with an empty module registry.
+func NewRunner() *Runner
+
+// RegisterModule adds a module to the registry.
+// If a module with the same name is already registered, it will be overwritten
+// and a warning will be logged.
+func (r *Runner) RegisterModule(mod module.Module)
+
+// RunModules executes the specified modules in order.
+// It checks IsInstalled() before calling Install() to ensure idempotency.
+// If dryRun is true, it logs what would happen without actually executing Install().
+// Returns an error if any module fails to execute or if a module name is not found.
+func (r *Runner) RunModules(names []string, cfg *config.Config, dryRun bool) error
+
+// GetModule returns a module from the registry by name.
+// Returns nil if the module is not found.
+func (r *Runner) GetModule(name string) module.Module
+
+// ListModules returns a list of all registered module names.
+func (r *Runner) ListModules() []string
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/runner"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/module"
+)
+
+// Create a new runner
+r := runner.NewRunner()
+
+// Register modules
+baselineMod := &BaselineModule{}
+dockerMod := &DockerModule{}
+r.RegisterModule(baselineMod)
+r.RegisterModule(dockerMod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Execute modules
+moduleNames := []string{"baseline", "docker"}
+err = r.RunModules(moduleNames, cfg, false)
+if err != nil {
+    log.Error("Failed to execute modules: %v", err)
+}
+
+// Dry-run mode
+err = r.RunModules(moduleNames, cfg, true)
+if err != nil {
+    log.Error("Dry-run failed: %v", err)
+}
+
+// List all registered modules
+modules := r.ListModules()
+log.Info("Available modules: %v", modules)
+
+// Get a specific module
+mod := r.GetModule("baseline")
+if mod != nil {
+    log.Info("Found module: %s", mod.Description())
+}
+```
+
+### Behavior
+
+- **Idempotency**: The runner checks `IsInstalled()` before calling `Install()` for each module. If a module is already installed, it is skipped with a log message.
+- **Error Handling**: Errors from `IsInstalled()` or `Install()` are logged and collected. The runner continues processing remaining modules even if one fails, but returns an error at the end if any modules failed.
+- **Dry-Run Mode**: When `dryRun` is true, the runner checks `IsInstalled()` but does not call `Install()`. It logs what would happen without making changes.
+- **Module Registry**: Modules are registered by their name (from `Module.Name()`). Duplicate registrations overwrite the previous module with a warning.
+- **Order**: Modules are executed in the order specified in the `names` slice.
+- **Unknown Modules**: If a module name is not found in the registry, an error is logged and the runner continues with the next module.
+
+### Error Handling
+
+- **Empty Module List**: Returns an error if no modules are specified.
+- **Unknown Module**: Returns an error if a module name is not found in the registry.
+- **IsInstalled Error**: If `IsInstalled()` returns an error, it is logged and the module is skipped.
+- **Install Error**: If `Install()` returns an error, it is logged and collected. The runner continues with remaining modules.
+- **Multiple Errors**: If multiple modules fail, all errors are collected and returned together.
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+
