@@ -119,13 +119,20 @@ func runCommand(cmd *cobra.Command, args []string) error {
 
 	log.Info("Config file: %s", configFlag)
 
-	// Store config, profile modules, and selected modules for later use (will be used in subsequent tasks)
-	_ = cfg
-	_ = profileModules
-	_ = selectedModules
+	// Combine profile modules and selected modules
+	modulesToExecute := combineModules(profileModules, selectedModules)
+	if len(modulesToExecute) == 0 {
+		return fmt.Errorf("no modules to execute")
+	}
 
-	// For now, just exit successfully - actual execution will be in later tasks
-	log.Info("Flag parsing complete. Execution will be implemented in subsequent tasks.")
+	log.Info("Modules to execute: %s", strings.Join(modulesToExecute, ", "))
+
+	// Execute modules using runner
+	if err := executeModules(modulesToExecute, cfg, dryRunFlag); err != nil {
+		return fmt.Errorf("module execution failed: %w", err)
+	}
+
+	log.Success("All modules executed successfully")
 	return nil
 }
 
@@ -233,6 +240,52 @@ func registerAllModules() *runner.Runner {
 	r.RegisterModule(&user.UserModule{})
 
 	return r
+}
+
+// combineModules merges profile modules and selected modules, deduplicating module names.
+// Profile modules come first, followed by selected modules (which may override duplicates).
+// Returns the combined and deduplicated module list.
+func combineModules(profileModules []string, selectedModules []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0)
+
+	// Add profile modules first
+	for _, module := range profileModules {
+		if !seen[module] {
+			result = append(result, module)
+			seen[module] = true
+		}
+	}
+
+	// Add selected modules (may include duplicates from profile, but we deduplicate)
+	for _, module := range selectedModules {
+		if !seen[module] {
+			result = append(result, module)
+			seen[module] = true
+		}
+	}
+
+	return result
+}
+
+// executeModules creates a runner instance, registers all available modules, and executes
+// the specified modules with the given configuration and dry-run flag.
+// Returns an error if module execution fails.
+func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error {
+	if len(moduleNames) == 0 {
+		return fmt.Errorf("no modules specified")
+	}
+
+	// Create runner and register all modules
+	r := registerAllModules()
+
+	// Execute modules
+	log.Info("Starting module execution...")
+	if err := r.RunModules(moduleNames, cfg, dryRun); err != nil {
+		return fmt.Errorf("failed to execute modules: %w", err)
+	}
+
+	return nil
 }
 
 // listProfilesAndModules displays all available profiles and modules in a user-friendly format.
