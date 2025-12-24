@@ -15,6 +15,6 @@ This document lists all tasks associated with PBI 8.
 | 8-5 | [Implement --list flag functionality](./8-5.md) | Done | Add --list flag to display available modules and profiles |
 | 8-6 | [Integrate runner with CLI execution](./8-6.md) | Done | Connect runner package to CLI for module execution with error handling |
 | 8-7 | [Add dry-run mode integration](./8-7.md) | Done | Integrate dry-run flag with logging and runner execution |
-| 8-8 | [Add error handling and exit codes](./8-8.md) | Proposed | Implement proper error handling, exit codes, and user-friendly error messages |
+| 8-8 | [Add error handling and exit codes](./8-8.md) | Done | Implement proper error handling, exit codes, and user-friendly error messages |
 | 8-9 | [E2E CoS Test](./8-9.md) | Proposed | End-to-end test verifying all CLI functionality and acceptance criteria |
 
