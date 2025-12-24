@@ -9,7 +9,7 @@ This document lists all tasks associated with PBI 8.
 | Task ID | Name | Status | Description |
 | :------ | :--- | :----- | :---------- |
 | 8-1 | [Create main.go structure with flag parsing](./8-1.md) | Done | Create main.go with flag definitions, help text, and basic CLI structure |
-| 8-2 | [Implement config file loading](./8-2.md) | Proposed | Load and validate config file with default path handling (config.yaml) |
+| 8-2 | [Implement config file loading](./8-2.md) | Done | Load and validate config file with default path handling (config.yaml) |
 | 8-3 | [Implement profile selection and validation](./8-3.md) | Proposed | Add profile selection logic with validation and module resolution |
 | 8-4 | [Implement module selection parsing](./8-4.md) | Proposed | Parse comma-separated module list and validate module names |
 | 8-5 | [Implement --list flag functionality](./8-5.md) | Proposed | Add --list flag to display available modules and profiles |
