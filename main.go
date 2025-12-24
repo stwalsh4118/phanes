@@ -104,15 +104,22 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		profileModules = modules
 	}
 
-	// Log what we're about to do
+	// Handle module selection if --modules flag is set
+	var selectedModules []string
 	if modulesFlag != "" {
-		log.Info("Modules selected: %s", modulesFlag)
+		modules, err := parseModuleList(modulesFlag)
+		if err != nil {
+			return fmt.Errorf("module parsing failed: %w", err)
+		}
+		selectedModules = modules
 	}
+
 	log.Info("Config file: %s", configFlag)
 
-	// Store config and profile modules for later use (will be used in subsequent tasks)
+	// Store config, profile modules, and selected modules for later use (will be used in subsequent tasks)
 	_ = cfg
 	_ = profileModules
+	_ = selectedModules
 
 	// For now, just exit successfully - actual execution will be in later tasks
 	log.Info("Flag parsing complete. Execution will be implemented in subsequent tasks.")
@@ -168,6 +175,46 @@ func getProfileModules(profileName string) ([]string, error) {
 	// Log profile selection and modules
 	log.Info("Profile selected: %s", profileName)
 	log.Info("Profile modules: %s", strings.Join(modules, ", "))
+
+	return modules, nil
+}
+
+// parseModuleList parses a comma-separated module list string.
+// It splits by comma, trims whitespace, filters empty strings, and deduplicates module names.
+// Returns the parsed and validated module list.
+// Note: Actual module validation against the registry will be done by the runner in task 8-6.
+func parseModuleList(moduleStr string) ([]string, error) {
+	if moduleStr == "" {
+		return nil, fmt.Errorf("empty module list")
+	}
+
+	// Split by comma
+	parts := strings.Split(moduleStr, ",")
+
+	// Trim whitespace and filter out empty strings
+	modules := make([]string, 0, len(parts))
+	seen := make(map[string]bool)
+
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		// Filter out empty strings
+		if trimmed == "" {
+			continue
+		}
+		// Deduplicate
+		if !seen[trimmed] {
+			modules = append(modules, trimmed)
+			seen[trimmed] = true
+		}
+	}
+
+	// Check if we have any modules after filtering
+	if len(modules) == 0 {
+		return nil, fmt.Errorf("no valid modules found in module list")
+	}
+
+	// Log selected modules
+	log.Info("Modules selected: %s", strings.Join(modules, ", "))
 
 	return modules, nil
 }
