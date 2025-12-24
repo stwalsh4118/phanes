@@ -396,3 +396,75 @@ All flags are defined on the root command:
 - `github.com/spf13/cobra` v1.10.2
 - `github.com/spf13/pflag` v1.0.10 (indirect, used by Cobra)
 
+## Module Interface
+
+Package: `github.com/stwalsh4118/phanes/internal/module`
+
+Defines the core interface that all provisioning modules must implement. This interface ensures consistency across all modules and enables the runner to execute modules in a uniform way.
+
+### Public Interface
+
+```go
+// Module defines the interface that all provisioning modules must implement.
+type Module interface {
+    // Name returns the unique name identifier for this module.
+    Name() string
+
+    // Description returns a human-readable description of what this module does.
+    Description() string
+
+    // IsInstalled checks if this module is already installed/configured.
+    // Returns true if installed, false if needs installation, error on check failure.
+    IsInstalled() (bool, error)
+
+    // Install performs the installation and configuration of this module.
+    // The cfg parameter provides access to all configuration values.
+    // Returns an error if installation fails.
+    Install(cfg *config.Config) error
+}
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/module"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Example module implementation
+type BaselineModule struct{}
+
+func (m *BaselineModule) Name() string {
+    return "baseline"
+}
+
+func (m *BaselineModule) Description() string {
+    return "Sets timezone, locale, and runs apt update"
+}
+
+func (m *BaselineModule) IsInstalled() (bool, error) {
+    // Check if baseline configuration is already applied
+    return false, nil
+}
+
+func (m *BaselineModule) Install(cfg *config.Config) error {
+    // Perform installation steps using cfg for configuration
+    return nil
+}
+
+// Register module with runner
+runner.RegisterModule(&BaselineModule{})
+```
+
+### Behavior
+
+- **Idempotency**: All modules must be idempotent - safe to run multiple times. The runner calls `IsInstalled()` before `Install()`.
+- **Error Handling**: Both `IsInstalled()` and `Install()` return errors that the runner handles appropriately.
+- **Configuration**: Modules receive a `*config.Config` parameter in `Install()` to access all configuration values.
+- **Naming**: Module names must be unique and are used for registration and profile references.
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - For configuration access
+
