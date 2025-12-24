@@ -1,5 +1,5 @@
 # Air configuration for hot reload
-# See: https://github.com/cosmtrek/air
+# See: https://github.com/air-verse/air
 
 root = "."
 testdata_dir = "testdata"

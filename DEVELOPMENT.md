@@ -24,7 +24,7 @@ make dev
 make air
 ```
 
-This uses [air](https://github.com/cosmtrek/air) to watch for file changes and automatically rebuild/restart the application.
+This uses [air](https://github.com/air-verse/air) to watch for file changes and automatically rebuild/restart the application.
 
 ### Building
 

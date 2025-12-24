@@ -87,7 +87,7 @@ install-tools: ## Install development tools (air, golangci-lint)
 	@echo "Installing development tools..."
 	@if ! command -v air > /dev/null; then \
 		echo "Installing air..."; \
-		go install github.com/cosmtrek/air@latest; \
+		go install github.com/air-verse/air@latest; \
 	else \
 		echo "air is already installed"; \
 	fi
