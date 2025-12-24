@@ -780,3 +780,125 @@ The module uses the following configuration fields:
 - `github.com/stwalsh4118/phanes/internal/exec` - Command execution
 - `github.com/stwalsh4118/phanes/internal/log` - Logging functions
 
+## User Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/user`
+
+Implements the user creation and SSH key setup module that creates a non-root user, sets up SSH key access, and configures passwordless sudo. This module ensures secure user access without root privileges.
+
+### Public Types
+
+```go
+// UserModule implements the Module interface for user creation and SSH key setup.
+type UserModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "user"
+func (m *UserModule) Name() string
+
+// Description returns "Creates user and sets up SSH keys"
+func (m *UserModule) Description() string
+
+// IsInstalled checks if the user module is already installed.
+// Note: Since IsInstalled() doesn't receive config, it performs a generic check
+// to see if the system appears to have been set up for user management.
+// The Install() method performs the specific checks with config and is fully idempotent.
+func (m *UserModule) IsInstalled() (bool, error)
+
+// Install creates the user, sets up SSH keys, and configures passwordless sudo.
+// This method is idempotent - it checks if each step is already done before doing it.
+// Validates username and SSH key format before proceeding.
+func (m *UserModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/user"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register user module
+mod := &user.UserModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install user configuration
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install user: %v", err)
+        return
+    }
+    log.Success("User module installation completed")
+} else {
+    log.Skip("User module already configured")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.User.Username` - Username to create (required)
+- `config.User.SSHPublicKey` - SSH public key to add to authorized_keys (required)
+
+### Behavior
+
+- **User Creation**: Creates user with home directory using `useradd -m -s /bin/bash <username>`. Handles case where user already exists gracefully.
+- **SSH Directory**: Creates `~/.ssh` directory with permissions 700 if it doesn't exist.
+- **SSH Key**: Adds SSH public key to `~/.ssh/authorized_keys` with permissions 600. Validates SSH key format (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss). Skips if key already exists.
+- **Sudoers**: Creates `/etc/sudoers.d/<username>` file with passwordless sudo configuration. Validates sudoers file with `visudo -c` before applying. Sets permissions 0440.
+- **Idempotency**: `Install()` is fully idempotent - checks if user exists, if SSH key is already in authorized_keys, and if sudoers file is correctly configured before making changes.
+- **Error Handling**: Validates username and SSH key format before proceeding. Returns descriptive errors if any step fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or creating files.
+- **Logging**: Uses `log.Info()` for progress, `log.Success()` for completion, `log.Skip()` for already-configured items, and `log.Error()` for errors.
+
+### SSH Key Validation
+
+The module validates SSH public key format. Valid formats include:
+- `ssh-rsa` - RSA keys
+- `ssh-ed25519` - Ed25519 keys
+- `ecdsa-sha2-*` - ECDSA keys (any variant)
+- `ssh-dss` - DSA keys
+
+### Commands Used
+
+- `useradd -m -s /bin/bash <username>` - Create user with home directory
+- `id <username>` - Check if user exists (via user.Lookup)
+- `visudo -c -f <file>` - Validate sudoers file
+
+### File Operations
+
+- Creates `~/.ssh` directory with permissions 700
+- Creates/updates `~/.ssh/authorized_keys` with permissions 600
+- Creates `/etc/sudoers.d/<username>` with permissions 0440
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `os/user` - User lookup
+- `path/filepath` - Path operations
+
