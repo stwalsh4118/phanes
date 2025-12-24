@@ -335,4 +335,3 @@ func TestUserModule_Install_SSHKeyDeduplication(t *testing.T) {
 		t.Error("sshKeyExists() should find existing key")
 	}
 }
-

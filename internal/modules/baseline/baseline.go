@@ -38,7 +38,7 @@ func (m *BaselineModule) IsInstalled() (bool, error) {
 	// Try timedatectl first (requires systemd), fallback to /etc/timezone if not available
 	var timezone string
 	var err error
-	
+
 	timezone, err = exec.RunWithOutput("timedatectl", "show", "-p", "Timezone", "--value")
 	if err != nil {
 		// timedatectl not available (e.g., in Docker containers without systemd)
@@ -53,7 +53,7 @@ func (m *BaselineModule) IsInstalled() (bool, error) {
 			return false, nil
 		}
 	}
-	
+
 	timezone = strings.TrimSpace(timezone)
 	if timezone == "" {
 		return false, nil

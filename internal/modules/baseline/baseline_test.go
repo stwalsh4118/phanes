@@ -86,7 +86,7 @@ func TestBaselineModule_IsInstalled_WithLocaleFile(t *testing.T) {
 	// Create a temporary locale file for testing
 	_ = t.TempDir()
 	_ = filepath.Join("test", "locale")
-	
+
 	// Test with UTF-8 locale
 	testCases := []struct {
 		name     string
