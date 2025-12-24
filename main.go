@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -141,7 +142,7 @@ func loadConfig(path string) (*config.Config, error) {
 	cfg, err := config.Load(path)
 	if err != nil {
 		// Provide clear error messages based on error type
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// This shouldn't happen since we checked FileExists, but handle it anyway
 			return nil, fmt.Errorf("config file not found: %s", path)
 		}
