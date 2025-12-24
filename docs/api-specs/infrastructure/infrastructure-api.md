@@ -962,3 +962,140 @@ The module validates SSH public key format. Valid formats include:
 - `os/user` - User lookup
 - `path/filepath` - Path operations
 
+## Security Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/security`
+
+Implements the security hardening module that configures UFW firewall, installs and configures fail2ban, and hardens SSH configuration. Uses embedded templates for SSH and fail2ban configs.
+
+### Public Types
+
+```go
+// SecurityModule implements the Module interface for security configuration.
+type SecurityModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "security"
+func (m *SecurityModule) Name() string
+
+// Description returns "Configures UFW, fail2ban, and SSH hardening"
+func (m *SecurityModule) Description() string
+
+// IsInstalled checks if security configuration is already applied.
+// Verifies that UFW is enabled, fail2ban is running, and SSH config has key security settings.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *SecurityModule) IsInstalled() (bool, error)
+
+// Install configures UFW firewall, fail2ban, and SSH hardening.
+// Uses cfg.Security.SSHPort (defaults to 22) and cfg.Security.AllowPasswordAuth (defaults to false).
+func (m *SecurityModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/security"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register security module
+mod := &security.SecurityModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install security configuration
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install security: %v", err)
+        return
+    }
+    log.Success("Security configuration installed")
+} else {
+    log.Skip("Security already configured")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Security.SSHPort` - SSH port to configure (defaults to 22)
+- `config.Security.AllowPasswordAuth` - Whether to allow password authentication (defaults to false)
+
+### Behavior
+
+- **UFW Firewall**: Installs UFW if not installed, allows SSH port (from config), HTTP (80), and HTTPS (443), then enables UFW. Verifies UFW is active after enabling.
+- **Fail2ban**: Installs fail2ban if not installed, creates `/etc/fail2ban/jail.local` from embedded template with SSH jail configuration, starts and enables fail2ban service. Verifies fail2ban is running after starting.
+- **SSH Hardening**: Backs up existing `/etc/ssh/sshd_config`, creates new config from embedded template with security settings (disables root login, configures password auth based on config, enables pubkey auth, etc.), validates config with `sshd -t`, and reloads SSH service. Warns user if password auth is being disabled.
+- **Idempotency**: `IsInstalled()` checks if UFW is enabled, fail2ban is running, and SSH config has key security settings. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Validates SSH port (must be between 1 and 65535). Returns descriptive errors if any step fails. SSH config validation failures prevent invalid config from being applied (restores backup if validation fails).
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files. Still validates SSH config in dry-run mode.
+- **Logging**: Uses `log.Info()` for progress, `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when disabling password authentication, and `log.Error()` for errors.
+
+### Embedded Templates
+
+The module uses embedded templates for configuration files. Templates are located in `internal/modules/security/` (same directory as the module) because `go:embed` doesn't support `..` paths.
+
+- `internal/modules/security/sshd_config.tmpl` - SSH server configuration template
+  - Variables: `{{.SSHPort}}`, `{{.AllowPasswordAuth}}`
+  - Includes security hardening settings (no root login, password auth configurable, pubkey auth enabled, etc.)
+- `internal/modules/security/jail.local.tmpl` - Fail2ban jail configuration template
+  - Variables: `{{.SSHPort}}`
+  - Configures SSH jail with ban time, find time, and max retries
+
+### Commands Used
+
+- `apt-get install -y ufw` - Install UFW firewall
+- `ufw allow <port>/tcp` - Allow port in UFW
+- `ufw --force enable` - Enable UFW firewall
+- `ufw status` - Check UFW status
+- `apt-get install -y fail2ban` - Install fail2ban
+- `systemctl enable --now fail2ban` - Start and enable fail2ban service
+- `systemctl is-active fail2ban` - Check fail2ban status
+- `sshd -t` - Validate SSH configuration
+- `systemctl reload sshd` or `systemctl reload ssh` - Reload SSH service
+
+### File Operations
+
+- Creates `/etc/fail2ban/jail.local` with permissions 0644
+- Creates `/etc/ssh/sshd_config` with permissions 0644
+- Backs up existing `/etc/ssh/sshd_config` to `/etc/ssh/sshd_config.backup` before modification
+
+### Security Considerations
+
+- **Password Authentication**: When `AllowPasswordAuth` is false, the module warns the user before disabling password authentication. Users must ensure SSH key access is configured before disabling password auth.
+- **SSH Config Validation**: The module validates SSH configuration with `sshd -t` before applying changes. If validation fails, the backup is restored to prevent locking users out.
+- **UFW Rules**: The module allows SSH port (from config), HTTP (80), and HTTPS (443). Additional ports must be configured manually or via other modules.
+- **Fail2ban Configuration**: The module configures fail2ban with reasonable defaults (1 hour ban time, 10 minute find time, 5 max retries). These can be customized by editing `/etc/fail2ban/jail.local` after installation.
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `embed` - Template embedding
+- `text/template` - Template rendering
+- `os` - File operations
+- `bytes` - Template output buffering
+
