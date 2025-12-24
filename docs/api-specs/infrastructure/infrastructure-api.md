@@ -371,9 +371,43 @@ All flags are defined on the root command:
 
 ### Exit Codes
 
-- **0**: Success
-- **1**: General error
-- **2**: Invalid usage (wrong flags or arguments)
+- **0**: Success (including when `--list` flag is used)
+- **1**: General error (config errors, profile errors, module errors, execution failures, panics)
+- **2**: Invalid usage (no profile/modules specified, usage errors)
+
+### Error Handling
+
+The CLI provides comprehensive error handling with clear, actionable error messages:
+
+#### Error Types
+
+```go
+// usageError distinguishes usage errors (exit code 2) from general errors (exit code 1)
+type usageError struct {
+    message string
+}
+```
+
+#### Error Handling Behavior
+
+- **Panic Recovery**: Panic recovery is implemented in both `runCommand()` and `main()` using `defer` and `recover()`. Panics are logged and program exits with code 1.
+- **Config Errors**:
+  - **File not found**: Shows file path and suggests checking if file exists
+  - **Invalid YAML**: Shows file path, error details, and suggests checking YAML syntax
+  - **Validation errors**: Shows which field is missing and provides specific guidance (e.g., "Please add 'username' field under 'user' section")
+- **Profile Errors**: Shows profile name that wasn't found, lists all available profiles, suggests using `--list` flag
+- **Module Errors**:
+  - **Unknown module**: Shows error details, lists available modules, suggests using `--list` flag
+  - **Execution failures**: Shows which module failed with clear error messages
+- **All Errors**: Use `log.Error()` for consistent error logging and include actionable suggestions
+
+#### Error Message Format
+
+All error messages:
+- Use `log.Error()` for consistent error logging
+- Include actionable suggestions (e.g., "Use --list to see all available modules")
+- Show available options when applicable (profiles, modules)
+- Provide specific guidance for fixing issues (e.g., which config field is missing)
 
 ### Behavior
 
@@ -388,17 +422,22 @@ All flags are defined on the root command:
   - Logs "Would install module {name} (dry-run)" for uninstalled modules
   - Logs "Module {name} is already installed (dry-run)" for installed modules
 - **List Mode**: When `--list` is set, displays all available profiles and modules, then exits without executing
-- **Error Handling**: Returns errors from `runCommand()` which Cobra handles and displays with help text
+- **Error Handling**: Returns errors from `runCommand()` which are checked in `main()` for error type (usageError vs general error) and appropriate exit code is set
 - **Version**: Built-in version support via Cobra's `Version` field
 
 ### Implementation Details
 
-- **Command Execution**: `runCommand()` function handles all command logic
+- **Command Execution**: `runCommand()` function handles all command logic with panic recovery
 - **Flag Access**: Flags are accessed via package-level variables set by Cobra
-- **Error Propagation**: Errors returned from `runCommand()` are handled in `main()` with appropriate exit codes
+- **Error Propagation**: Errors returned from `runCommand()` are checked in `main()` using `errors.As()` to determine error type (usageError vs general error) and appropriate exit code is set
+- **Panic Recovery**: Panic recovery is implemented in both `runCommand()` (using `defer` and `recover()`) and `main()` as a safety net
 - **Help Integration**: Cobra automatically shows help when `--help` is used or when validation fails
 - **List Functionality**: `listProfilesAndModules()` function displays profiles and modules. Uses `registerAllModules()` helper to create runner and register all available modules for listing
 - **Module Registration**: `registerAllModules()` creates a runner instance and registers all available modules (currently baseline and user). This function is reusable for both listing and execution
+- **Error Handling Functions**:
+  - `loadConfig()`: Handles config file loading with detailed error messages for file not found, invalid YAML, and validation errors
+  - `getProfileModules()`: Handles profile selection with error messages showing available profiles
+  - `executeModules()`: Handles module execution with error messages showing available modules when unknown modules are specified
 - **Dry-Run Integration**: 
   - `runCommand()` sets dry-run mode via `log.SetDryRun(true)` when `--dry-run` flag is set
   - `executeModules()` receives `dryRun` parameter and passes it to `runner.RunModules()`
