@@ -867,8 +867,8 @@ The module uses the following configuration fields:
 ### Behavior
 
 - **User Creation**: Creates user with home directory using `useradd -m -s /bin/bash <username>`. Handles case where user already exists gracefully.
-- **SSH Directory**: Creates `~/.ssh` directory with permissions 700 if it doesn't exist.
-- **SSH Key**: Adds SSH public key to `~/.ssh/authorized_keys` with permissions 600. Validates SSH key format (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss). Skips if key already exists.
+- **SSH Directory**: Creates `~/.ssh` directory with permissions 700 if it doesn't exist. Sets ownership to the user (required by OpenSSH StrictModes).
+- **SSH Key**: Adds SSH public key to `~/.ssh/authorized_keys` with permissions 600. Sets ownership to the user (required by OpenSSH StrictModes). Validates SSH key format (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, ssh-dss). Skips if key already exists.
 - **Sudoers**: Creates `/etc/sudoers.d/<username>` file with passwordless sudo configuration. Validates sudoers file with `visudo -c` before applying. Sets permissions 0440.
 - **Idempotency**: `Install()` is fully idempotent - checks if user exists, if SSH key is already in authorized_keys, and if sudoers file is correctly configured before making changes.
 - **Error Handling**: Validates username and SSH key format before proceeding. Returns descriptive errors if any step fails.
@@ -891,9 +891,17 @@ The module validates SSH public key format. Valid formats include:
 
 ### File Operations
 
-- Creates `~/.ssh` directory with permissions 700
-- Creates/updates `~/.ssh/authorized_keys` with permissions 600
+- Creates `~/.ssh` directory with permissions 700 and ownership set to the user
+- Creates/updates `~/.ssh/authorized_keys` with permissions 600 and ownership set to the user
 - Creates `/etc/sudoers.d/<username>` with permissions 0440
+
+### Ownership Requirements
+
+**Critical**: When running as root, the module sets correct ownership on `.ssh` directory and `authorized_keys` file using `os.Chown()` with the user's UID/GID. This is required because:
+- OpenSSH's StrictModes (enabled by default) requires these files to be owned by the user
+- Files created by root will have `root:root` ownership by default
+- SSH key authentication will silently fail if ownership is incorrect
+- The module looks up the user's UID/GID after user creation and applies ownership to all SSH-related files
 
 ### Dependencies
 

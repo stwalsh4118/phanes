@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/stwalsh4118/phanes/internal/config"
@@ -168,6 +169,10 @@ func (m *UserModule) Install(cfg *config.Config) error {
 		return fmt.Errorf("failed to check if user exists: %w", err)
 	}
 
+	// Get user's UID and GID for setting file ownership
+	// We'll look this up after user creation/verification to ensure we have the correct values
+	var userUID, userGID int
+
 	if !userExists {
 		if dryRun {
 			log.Info("Would create user: %s", username)
@@ -189,6 +194,23 @@ func (m *UserModule) Install(cfg *config.Config) error {
 		log.Skip("User %s already exists", username)
 	}
 
+	// Look up user info to get UID/GID for file ownership (required for OpenSSH StrictModes)
+	// This must happen after user creation to ensure we have the correct UID/GID
+	if !dryRun {
+		userInfo, err := user.Lookup(username)
+		if err != nil {
+			return fmt.Errorf("failed to look up user %s: %w", username, err)
+		}
+		userUID, err = strconv.Atoi(userInfo.Uid)
+		if err != nil {
+			return fmt.Errorf("failed to parse user UID: %w", err)
+		}
+		userGID, err = strconv.Atoi(userInfo.Gid)
+		if err != nil {
+			return fmt.Errorf("failed to parse user GID: %w", err)
+		}
+	}
+
 	// Create .ssh directory
 	if dryRun {
 		log.Info("Would create SSH directory: %s", sshDir)
@@ -201,8 +223,16 @@ func (m *UserModule) Install(cfg *config.Config) error {
 			if err := os.Chmod(sshDir, sshDirPerm); err != nil {
 				return fmt.Errorf("failed to set SSH directory permissions: %w", err)
 			}
+			// Set ownership to the user (required by OpenSSH StrictModes)
+			if err := os.Chown(sshDir, userUID, userGID); err != nil {
+				return fmt.Errorf("failed to set SSH directory ownership: %w", err)
+			}
 			log.Success("Created SSH directory: %s", sshDir)
 		} else {
+			// Directory exists, but ensure correct ownership
+			if err := os.Chown(sshDir, userUID, userGID); err != nil {
+				return fmt.Errorf("failed to set SSH directory ownership: %w", err)
+			}
 			log.Skip("SSH directory already exists: %s", sshDir)
 		}
 	}
@@ -238,6 +268,10 @@ func (m *UserModule) Install(cfg *config.Config) error {
 			}
 			if err := os.Chmod(authorizedKeysPath, authorizedKeysPerm); err != nil {
 				return fmt.Errorf("failed to set authorized_keys permissions: %w", err)
+			}
+			// Set ownership to the user (required by OpenSSH StrictModes)
+			if err := os.Chown(authorizedKeysPath, userUID, userGID); err != nil {
+				return fmt.Errorf("failed to set authorized_keys ownership: %w", err)
 			}
 			log.Success("Added SSH key to authorized_keys")
 		}
