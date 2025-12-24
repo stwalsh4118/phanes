@@ -73,4 +73,3 @@ type Module interface {
 	// and may stop execution or continue depending on error severity.
 	Install(cfg *config.Config) error
 }
-
