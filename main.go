@@ -12,6 +12,7 @@ import (
 	"github.com/stwalsh4118/phanes/internal/exec"
 	"github.com/stwalsh4118/phanes/internal/log"
 	"github.com/stwalsh4118/phanes/internal/modules/baseline"
+	"github.com/stwalsh4118/phanes/internal/modules/security"
 	"github.com/stwalsh4118/phanes/internal/modules/user"
 	"github.com/stwalsh4118/phanes/internal/profile"
 	"github.com/stwalsh4118/phanes/internal/runner"
@@ -168,14 +169,14 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		// Provide clear, actionable error messages based on error type
 		errStr := err.Error()
-		
+
 		// Check for file not found (shouldn't happen after FileExists check, but handle anyway)
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(errStr, "no such file") {
 			log.Error("Config file not found: %s", path)
 			log.Error("Please ensure the config file exists at the specified path.")
 			return nil, fmt.Errorf("config file not found: %s", path)
 		}
-		
+
 		// Check for YAML parsing errors
 		if strings.Contains(errStr, "failed to parse YAML") || strings.Contains(errStr, "yaml") {
 			log.Error("Invalid YAML syntax in config file: %s", path)
@@ -183,7 +184,7 @@ func loadConfig(path string) (*config.Config, error) {
 			log.Error("Please check the YAML syntax in your config file.")
 			return nil, fmt.Errorf("invalid YAML in config file %s: %w", path, err)
 		}
-		
+
 		// Check for validation errors
 		if strings.Contains(errStr, "validation failed") || strings.Contains(errStr, "required") {
 			log.Error("Config validation failed: %s", path)
@@ -199,7 +200,7 @@ func loadConfig(path string) (*config.Config, error) {
 			}
 			return nil, fmt.Errorf("config validation failed for %s: %w", path, err)
 		}
-		
+
 		// Generic error fallback
 		log.Error("Failed to load config file: %s", path)
 		log.Error("Error details: %v", err)
@@ -287,6 +288,7 @@ func registerAllModules() *runner.Runner {
 	// Note: As more modules are implemented, they should be added here
 	r.RegisterModule(&baseline.BaselineModule{})
 	r.RegisterModule(&user.UserModule{})
+	r.RegisterModule(&security.SecurityModule{})
 
 	return r
 }
@@ -332,22 +334,22 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 	log.Info("Starting module execution...")
 	if err := r.RunModules(moduleNames, cfg, dryRun); err != nil {
 		errStr := err.Error()
-		
+
 		// Check for unknown module errors
 		if strings.Contains(errStr, "not found in registry") {
 			// Extract module name from error if possible
 			log.Error("One or more modules not found in registry")
 			log.Error("Error details: %v", err)
-			
+
 			// Show available modules
 			availableModules := r.ListModules()
 			sort.Strings(availableModules)
 			log.Error("Available modules: %s", strings.Join(availableModules, ", "))
 			log.Error("Use --list to see all available modules and profiles.")
-			
+
 			return fmt.Errorf("module execution failed: %w", err)
 		}
-		
+
 		// Check for module execution failures
 		if strings.Contains(errStr, "failed to execute") || strings.Contains(errStr, "module") {
 			log.Error("Module execution failed")
@@ -355,7 +357,7 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 			log.Error("Check the error messages above for details about which module failed.")
 			return fmt.Errorf("module execution failed: %w", err)
 		}
-		
+
 		// Generic error fallback
 		log.Error("Module execution failed: %v", err)
 		return fmt.Errorf("module execution failed: %w", err)
@@ -415,15 +417,15 @@ func main() {
 			// Usage errors already logged in runCommand
 			os.Exit(2)
 		}
-		
+
 		// Check error message for usage-related errors (backup check)
 		errStr := err.Error()
-		if strings.Contains(errStr, "invalid usage") || 
-		   strings.Contains(errStr, "no modules to execute") ||
-		   strings.Contains(errStr, "either --profile or --modules") {
+		if strings.Contains(errStr, "invalid usage") ||
+			strings.Contains(errStr, "no modules to execute") ||
+			strings.Contains(errStr, "either --profile or --modules") {
 			os.Exit(2)
 		}
-		
+
 		// All other errors exit with code 1
 		// Error messages are already logged by the error handling functions
 		os.Exit(1)
