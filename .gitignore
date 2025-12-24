@@ -75,6 +75,8 @@ testdata/tmp/
 dist/
 build/
 bin/
+tmp/
+build-errors.log
 
 # Environment files
 .env
