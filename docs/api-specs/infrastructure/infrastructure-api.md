@@ -675,3 +675,108 @@ if profile.ProfileExists("dev") {
 
 - Standard library only (`fmt`, `sort`)
 
+## Baseline Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/baseline`
+
+Implements the baseline server configuration module that sets timezone, configures locale (UTF-8), and runs apt update. This is typically the first module executed in any profile.
+
+### Public Types
+
+```go
+// BaselineModule implements the Module interface for baseline server configuration.
+type BaselineModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "baseline"
+func (m *BaselineModule) Name() string
+
+// Description returns "Sets timezone, locale, and runs apt update"
+func (m *BaselineModule) Description() string
+
+// IsInstalled checks if baseline configuration is already applied.
+// Verifies that a timezone is set (not empty) and locale contains UTF-8.
+// Note: Since IsInstalled() doesn't receive config, it checks if
+// timezone/locale are configured, not if they match a specific configured value.
+func (m *BaselineModule) IsInstalled() (bool, error)
+
+// Install configures timezone, locale, and runs apt update.
+// Uses cfg.System.Timezone (defaults to "UTC" if empty).
+// Sets locale to en_US.UTF-8 and runs apt-get update.
+func (m *BaselineModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/baseline"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register baseline module
+mod := &baseline.BaselineModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install baseline configuration
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install baseline: %v", err)
+        return
+    }
+    log.Success("Baseline configuration installed")
+} else {
+    log.Skip("Baseline already configured")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.System.Timezone` - Timezone to set (e.g., "UTC", "America/New_York"). Defaults to "UTC" if empty.
+
+### Behavior
+
+- **Timezone**: Uses `timedatectl set-timezone` to set the system timezone. Verifies the timezone was set correctly after setting it.
+- **Locale**: Generates and configures `en_US.UTF-8` locale using `locale-gen` and `update-locale`. Verifies UTF-8 is configured.
+- **Apt Update**: Runs `apt-get update` to refresh package lists.
+- **Idempotency**: `IsInstalled()` checks if timezone is set and locale contains UTF-8. If both are configured, the module is considered installed.
+- **Error Handling**: All commands use the `exec` package and return descriptive errors if any step fails.
+- **Logging**: Uses `log.Info()` for progress, `log.Success()` for completion, and `log.Error()` for errors.
+
+### Commands Used
+
+- `timedatectl show -p Timezone --value` - Check current timezone
+- `timedatectl set-timezone <timezone>` - Set timezone
+- `locale` - Check current locale settings
+- `locale-gen en_US.UTF-8` - Generate UTF-8 locale
+- `update-locale LANG=en_US.UTF-8` - Update locale configuration
+- `apt-get update` - Update package lists
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+
