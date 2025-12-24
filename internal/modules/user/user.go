@@ -276,7 +276,23 @@ func (m *UserModule) Install(cfg *config.Config) error {
 			log.Success("Added SSH key to authorized_keys")
 		}
 	} else {
-		log.Skip("SSH key already exists in authorized_keys")
+		// Key exists, but ensure correct ownership and permissions (required by OpenSSH StrictModes)
+		// This ensures idempotency - if ownership was changed (e.g., to root:root), we fix it
+		if dryRun {
+			log.Info("SSH key already exists in authorized_keys (dry-run)")
+		} else {
+			// Ensure file exists before trying to fix ownership
+			if exec.FileExists(authorizedKeysPath) {
+				if err := os.Chmod(authorizedKeysPath, authorizedKeysPerm); err != nil {
+					return fmt.Errorf("failed to set authorized_keys permissions: %w", err)
+				}
+				// Set ownership to the user (required by OpenSSH StrictModes)
+				if err := os.Chown(authorizedKeysPath, userUID, userGID); err != nil {
+					return fmt.Errorf("failed to set authorized_keys ownership: %w", err)
+				}
+			}
+			log.Skip("SSH key already exists in authorized_keys")
+		}
 	}
 
 	// Configure passwordless sudo
