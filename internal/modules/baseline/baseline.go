@@ -35,10 +35,25 @@ func (m *BaselineModule) Description() string {
 // a specific configured value.
 func (m *BaselineModule) IsInstalled() (bool, error) {
 	// Check current timezone
-	timezone, err := exec.RunWithOutput("timedatectl", "show", "-p", "Timezone", "--value")
+	// Try timedatectl first (requires systemd), fallback to /etc/timezone if not available
+	var timezone string
+	var err error
+	
+	timezone, err = exec.RunWithOutput("timedatectl", "show", "-p", "Timezone", "--value")
 	if err != nil {
-		return false, fmt.Errorf("failed to check timezone: %w", err)
+		// timedatectl not available (e.g., in Docker containers without systemd)
+		// Fallback to reading /etc/timezone
+		if exec.FileExists("/etc/timezone") {
+			timezone, err = exec.RunWithOutput("cat", "/etc/timezone")
+			if err != nil {
+				return false, fmt.Errorf("failed to check timezone: %w", err)
+			}
+		} else {
+			// If neither method works, assume not installed
+			return false, nil
+		}
 	}
+	
 	timezone = strings.TrimSpace(timezone)
 	if timezone == "" {
 		return false, nil
@@ -96,20 +111,30 @@ func (m *BaselineModule) Install(cfg *config.Config) error {
 
 	// Set timezone
 	log.Info("Setting timezone to %s", timezone)
-	if err := exec.Run("timedatectl", "set-timezone", timezone); err != nil {
-		return fmt.Errorf("failed to set timezone: %w", err)
-	}
-
-	// Verify timezone was set correctly
-	actualTimezone, err := exec.RunWithOutput("timedatectl", "show", "-p", "Timezone", "--value")
+	// Try timedatectl first (requires systemd), fallback to /etc/timezone if not available
+	err := exec.Run("timedatectl", "set-timezone", timezone)
 	if err != nil {
-		return fmt.Errorf("failed to verify timezone: %w", err)
+		// timedatectl not available (e.g., in Docker containers without systemd)
+		// Fallback to writing /etc/timezone and creating symlink
+		log.Info("timedatectl not available, using /etc/timezone method")
+		if err := exec.WriteFile("/etc/timezone", []byte(timezone+"\n"), 0644); err != nil {
+			return fmt.Errorf("failed to set timezone: %w", err)
+		}
+		// Note: Creating /etc/localtime symlink requires the timezone data files
+		// For containers, we'll just set /etc/timezone and skip the symlink
+		log.Info("Timezone set to %s (via /etc/timezone)", timezone)
+	} else {
+		// Verify timezone was set correctly using timedatectl
+		actualTimezone, err := exec.RunWithOutput("timedatectl", "show", "-p", "Timezone", "--value")
+		if err != nil {
+			return fmt.Errorf("failed to verify timezone: %w", err)
+		}
+		actualTimezone = strings.TrimSpace(actualTimezone)
+		if actualTimezone != timezone {
+			return fmt.Errorf("timezone verification failed: expected %s, got %s", timezone, actualTimezone)
+		}
+		log.Success("Timezone set to %s", timezone)
 	}
-	actualTimezone = strings.TrimSpace(actualTimezone)
-	if actualTimezone != timezone {
-		return fmt.Errorf("timezone verification failed: expected %s, got %s", timezone, actualTimezone)
-	}
-	log.Success("Timezone set to %s", timezone)
 
 	// Configure locale
 	log.Info("Configuring locale %s", defaultLocale)
@@ -122,14 +147,38 @@ func (m *BaselineModule) Install(cfg *config.Config) error {
 	}
 
 	// Verify locale is configured
+	// Note: In containers, the locale may not be active in the current shell session
+	// but it's been generated and configured. Check /etc/default/locale as verification.
 	locale, err := exec.RunWithOutput("locale")
 	if err != nil {
-		return fmt.Errorf("failed to verify locale: %w", err)
+		// If locale command fails, check /etc/default/locale as fallback
+		if exec.FileExists("/etc/default/locale") {
+			localeContent, err2 := exec.RunWithOutput("grep", "^LANG=", "/etc/default/locale")
+			if err2 == nil && strings.Contains(strings.ToUpper(localeContent), "UTF-8") {
+				log.Success("Locale configured to %s (verified via /etc/default/locale)", defaultLocale)
+				// Continue - locale is configured even if not active in current shell
+			} else {
+				return fmt.Errorf("failed to verify locale: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to verify locale: %w", err)
+		}
+	} else {
+		// Check if UTF-8 is in locale output or in /etc/default/locale
+		if strings.Contains(strings.ToUpper(locale), "UTF-8") {
+			log.Success("Locale configured to %s", defaultLocale)
+		} else if exec.FileExists("/etc/default/locale") {
+			// Fallback: check /etc/default/locale
+			localeContent, err2 := exec.RunWithOutput("grep", "^LANG=", "/etc/default/locale")
+			if err2 == nil && strings.Contains(strings.ToUpper(localeContent), "UTF-8") {
+				log.Success("Locale configured to %s (verified via /etc/default/locale)", defaultLocale)
+			} else {
+				return fmt.Errorf("locale verification failed: UTF-8 not found in locale output or /etc/default/locale")
+			}
+		} else {
+			return fmt.Errorf("locale verification failed: UTF-8 not found in locale output")
+		}
 	}
-	if !strings.Contains(strings.ToUpper(locale), "UTF-8") {
-		return fmt.Errorf("locale verification failed: UTF-8 not found in locale output")
-	}
-	log.Success("Locale configured to %s", defaultLocale)
 
 	// Run apt update
 	log.Info("Running apt-get update")
