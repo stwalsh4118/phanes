@@ -581,3 +581,68 @@ if mod != nil {
 - `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
 - `github.com/stwalsh4118/phanes/internal/log` - Logging functions
 
+## Profile Package
+
+Package: `github.com/stwalsh4118/phanes/internal/profile`
+
+Defines server profiles as lists of module names and provides lookup functionality. Profiles represent common server configurations that combine multiple modules to achieve specific server setups.
+
+### Public Functions
+
+```go
+// GetProfile returns the list of module names for the specified profile.
+// Returns an error if the profile does not exist.
+func GetProfile(name string) ([]string, error)
+
+// ListProfiles returns a sorted list of all available profile names.
+func ListProfiles() []string
+
+// ProfileExists checks if a profile with the given name exists.
+// Returns true if the profile exists, false otherwise.
+func ProfileExists(name string) bool
+```
+
+### Available Profiles
+
+The following profiles are predefined:
+
+- **minimal**: `baseline`, `user`, `security`, `swap`, `updates`
+- **dev**: `baseline`, `user`, `security`, `swap`, `updates`, `docker`, `monitoring`, `devtools`
+- **web**: `baseline`, `user`, `security`, `swap`, `updates`, `docker`, `monitoring`, `caddy`
+- **database**: `baseline`, `user`, `security`, `swap`, `updates`, `docker`, `monitoring`, `postgres`, `redis`
+- **coolify**: `baseline`, `user`, `security`, `swap`, `updates`, `docker`, `coolify`
+
+### Usage Examples
+
+```go
+import "github.com/stwalsh4118/phanes/internal/profile"
+
+// Get modules for a profile
+modules, err := profile.GetProfile("dev")
+if err != nil {
+    log.Error("Profile not found: %v", err)
+    return
+}
+// modules = ["baseline", "user", "security", "swap", "updates", "docker", "monitoring", "devtools"]
+
+// List all available profiles
+profiles := profile.ListProfiles()
+// profiles = ["coolify", "database", "dev", "minimal", "web"]
+
+// Check if a profile exists
+if profile.ProfileExists("dev") {
+    log.Info("Dev profile is available")
+}
+```
+
+### Behavior
+
+- **Profile Lookup**: `GetProfile()` returns a copy of the module list to prevent external modification
+- **Sorted Results**: `ListProfiles()` returns profile names in alphabetical order
+- **Case Sensitive**: Profile names are case-sensitive (e.g., "dev" != "DEV")
+- **Error Handling**: `GetProfile()` returns an error with a clear message if the profile doesn't exist
+
+### Dependencies
+
+- Standard library only (`fmt`, `sort`)
+
