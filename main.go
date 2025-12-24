@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/stwalsh4118/phanes/internal/config"
+	"github.com/stwalsh4118/phanes/internal/exec"
 	"github.com/stwalsh4118/phanes/internal/log"
 )
 
@@ -84,6 +86,12 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		log.Warn("Both --profile and --modules specified. Profile modules will be combined with specified modules.")
 	}
 
+	// Load configuration file
+	cfg, err := loadConfig(configFlag)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Log what we're about to do (for now, just log the flags)
 	if profileFlag != "" {
 		log.Info("Profile selected: %s", profileFlag)
@@ -93,9 +101,39 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 	log.Info("Config file: %s", configFlag)
 
+	// Store config for later use (will be used in subsequent tasks)
+	_ = cfg
+
 	// For now, just exit successfully - actual execution will be in later tasks
 	log.Info("Flag parsing complete. Execution will be implemented in subsequent tasks.")
 	return nil
+}
+
+// loadConfig loads a configuration file from the given path.
+// If the file doesn't exist, it returns a default config with a warning.
+// If the file exists but is invalid, it returns an error with a clear message.
+func loadConfig(path string) (*config.Config, error) {
+	// Check if config file exists
+	if !exec.FileExists(path) {
+		log.Warn("Config file not found at %s, using default configuration", path)
+		log.Info("Note: Default config has empty username and SSH public key. These must be set in config file for module execution.")
+		return config.DefaultConfig(), nil
+	}
+
+	// Load config from file
+	cfg, err := config.Load(path)
+	if err != nil {
+		// Provide clear error messages based on error type
+		if os.IsNotExist(err) {
+			// This shouldn't happen since we checked FileExists, but handle it anyway
+			return nil, fmt.Errorf("config file not found: %s", path)
+		}
+		// config.Load() wraps errors, so we can return them directly
+		return nil, fmt.Errorf("failed to load config from %s: %w", path, err)
+	}
+
+	log.Info("Configuration loaded successfully from %s", path)
+	return cfg, nil
 }
 
 func main() {
