@@ -414,12 +414,32 @@ type Module interface {
     Description() string
 
     // IsInstalled checks if this module is already installed/configured.
-    // Returns true if installed, false if needs installation, error on check failure.
+    // Returns true if the module is already installed, false if it needs to be installed.
+    // Returns an error if the check fails (e.g., permission issues, system errors).
+    //
+    // This method should perform a quick check to determine if the module's
+    // configuration is already in place. For example:
+    //   - Check if a package is installed
+    //   - Check if a configuration file exists
+    //   - Check if a service is configured
+    //
+    // The runner will call this before Install() to ensure idempotency.
     IsInstalled() (bool, error)
 
     // Install performs the installation and configuration of this module.
-    // The cfg parameter provides access to all configuration values.
-    // Returns an error if installation fails.
+    // The cfg parameter provides access to all configuration values needed
+    // for the installation process.
+    //
+    // This method should only be called when IsInstalled() returns false.
+    // It should perform all necessary steps to install and configure the module,
+    // such as:
+    //   - Installing packages
+    //   - Creating configuration files
+    //   - Setting up services
+    //   - Applying security settings
+    //
+    // Returns an error if installation fails. The runner will handle the error
+    // and may stop execution or continue depending on error severity.
     Install(cfg *config.Config) error
 }
 ```
@@ -459,10 +479,12 @@ runner.RegisterModule(&BaselineModule{})
 
 ### Behavior
 
-- **Idempotency**: All modules must be idempotent - safe to run multiple times. The runner calls `IsInstalled()` before `Install()`.
-- **Error Handling**: Both `IsInstalled()` and `Install()` return errors that the runner handles appropriately.
-- **Configuration**: Modules receive a `*config.Config` parameter in `Install()` to access all configuration values.
-- **Naming**: Module names must be unique and are used for registration and profile references.
+- **Idempotency**: All modules must be idempotent - safe to run multiple times. The runner calls `IsInstalled()` before `Install()`. If `IsInstalled()` returns `true`, `Install()` will not be called.
+- **Error Handling**: Both `IsInstalled()` and `Install()` return errors that the runner handles appropriately. Errors from `IsInstalled()` cause the module to be skipped. Errors from `Install()` are collected and returned together.
+- **Configuration**: Modules receive a `*config.Config` parameter in `Install()` to access all configuration values needed for installation.
+- **Naming**: Module names must be unique and are used for registration and profile references. Names are case-sensitive.
+- **IsInstalled() Implementation**: Should perform quick checks (e.g., file existence, package installation status, service configuration) without making changes to the system.
+- **Install() Implementation**: Should only be called when `IsInstalled()` returns `false`. Must perform all necessary installation and configuration steps atomically where possible.
 
 ### Dependencies
 
@@ -506,6 +528,7 @@ func (r *Runner) RunModules(names []string, cfg *config.Config, dryRun bool) err
 func (r *Runner) GetModule(name string) module.Module
 
 // ListModules returns a list of all registered module names.
+// The order is not guaranteed (map iteration order). Use sort.Strings() if sorted order is needed.
 func (r *Runner) ListModules() []string
 ```
 
@@ -560,12 +583,18 @@ if mod != nil {
 
 ### Behavior
 
-- **Idempotency**: The runner checks `IsInstalled()` before calling `Install()` for each module. If a module is already installed, it is skipped with a log message.
-- **Error Handling**: Errors from `IsInstalled()` or `Install()` are logged and collected. The runner continues processing remaining modules even if one fails, but returns an error at the end if any modules failed.
-- **Dry-Run Mode**: When `dryRun` is true, the runner checks `IsInstalled()` but does not call `Install()`. It logs what would happen without making changes.
-- **Module Registry**: Modules are registered by their name (from `Module.Name()`). Duplicate registrations overwrite the previous module with a warning.
+- **Idempotency**: The runner checks `IsInstalled()` before calling `Install()` for each module. If a module is already installed, it is skipped with a log message using `log.Skip()`.
+- **Error Handling**: Errors from `IsInstalled()` or `Install()` are logged using `log.Error()` and collected. The runner continues processing remaining modules even if one fails, but returns an error at the end if any modules failed.
+- **Dry-Run Mode**: When `dryRun` is true, the runner checks `IsInstalled()` but does not call `Install()`. It logs what would happen without making changes. Uses `log.Skip()` for already-installed modules and `log.Info()` for modules that would be installed.
+- **Module Registry**: Modules are registered by their name (from `Module.Name()`). Duplicate registrations overwrite the previous module with a warning logged using `log.Warn()`.
 - **Order**: Modules are executed in the order specified in the `names` slice.
-- **Unknown Modules**: If a module name is not found in the registry, an error is logged and the runner continues with the next module.
+- **Unknown Modules**: If a module name is not found in the registry, an error is logged using `log.Error()` and the runner continues with the next module.
+- **Logging During Execution**: 
+  - `RegisterModule()` logs module registration using `log.Info()` with module name and description
+  - `RunModules()` logs "Processing module: {name}" before each module
+  - `RunModules()` logs "Installing module: {name}" before calling `Install()`
+  - `RunModules()` logs "Successfully installed module: {name}" using `log.Success()` after successful installation
+- **Module List Ordering**: `ListModules()` returns module names in an unsorted order (map iteration order). Use `sort.Strings()` if sorted order is needed.
 
 ### Error Handling
 
