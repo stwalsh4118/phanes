@@ -1,0 +1,115 @@
+.PHONY: help build test test-unit test-integration test-race lint vet fmt clean run dev air install-tools docker-test
+
+# Default target
+.DEFAULT_GOAL := help
+
+# Variables
+BINARY_NAME=phanes
+BUILD_DIR=tmp
+COVERAGE_FILE=coverage.out
+COVERAGE_HTML=coverage.html
+
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+build: ## Build the binary
+	@echo "Building $(BINARY_NAME)..."
+	@go build -o $(BUILD_DIR)/$(BINARY_NAME) .
+	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+
+run: build ## Build and run the binary
+	@./$(BUILD_DIR)/$(BINARY_NAME)
+
+dev: ## Run with air for hot reload (requires air to be installed)
+	@if ! command -v air > /dev/null; then \
+		echo "Error: air is not installed. Run 'make install-tools' to install it."; \
+		exit 1; \
+	fi
+	@air
+
+air: dev ## Alias for dev target
+
+test: ## Run all tests
+	@echo "Running all tests..."
+	@go test -v ./...
+
+test-unit: ## Run unit tests only
+	@echo "Running unit tests..."
+	@go test -v ./internal/...
+
+test-integration: ## Run integration tests only
+	@echo "Running integration tests..."
+	@if [ -d "test/integration" ]; then \
+		go test -v ./test/integration/...; \
+	else \
+		echo "No integration tests found in test/integration/"; \
+	fi
+
+test-race: ## Run tests with race detector
+	@echo "Running tests with race detector..."
+	@go test -race -v ./...
+
+test-coverage: ## Run tests with coverage
+	@echo "Running tests with coverage..."
+	@go test -coverprofile=$(COVERAGE_FILE) ./...
+	@go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
+	@echo "Coverage report generated: $(COVERAGE_HTML)"
+
+lint: ## Run golangci-lint (if available)
+	@if command -v golangci-lint > /dev/null; then \
+		echo "Running golangci-lint..."; \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not found. Skipping lint check."; \
+	fi
+
+vet: ## Run go vet
+	@echo "Running go vet..."
+	@go vet ./...
+
+fmt: ## Format code with gofmt
+	@echo "Formatting code..."
+	@go fmt ./...
+
+check: fmt vet lint test ## Run all checks (format, vet, lint, test)
+
+clean: ## Clean build artifacts
+	@echo "Cleaning..."
+	@rm -rf $(BUILD_DIR)
+	@rm -f $(COVERAGE_FILE) $(COVERAGE_HTML)
+	@rm -f build-errors.log
+	@go clean
+
+install-tools: ## Install development tools (air, golangci-lint)
+	@echo "Installing development tools..."
+	@if ! command -v air > /dev/null; then \
+		echo "Installing air..."; \
+		go install github.com/cosmtrek/air@latest; \
+	else \
+		echo "air is already installed"; \
+	fi
+	@if ! command -v golangci-lint > /dev/null; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
+	else \
+		echo "golangci-lint is already installed"; \
+	fi
+
+docker-test: ## Run tests in Docker containers
+	@./scripts/dev.sh test
+
+docker-build: ## Build Docker containers for testing
+	@./scripts/dev.sh build
+
+docker-up: ## Start Docker containers
+	@./scripts/dev.sh up
+
+docker-down: ## Stop Docker containers
+	@./scripts/dev.sh down
+
+docker-logs: ## Show Docker container logs
+	@./scripts/dev.sh logs
+
