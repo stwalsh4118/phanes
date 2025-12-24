@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stwalsh4118/phanes/internal/config"
 	"github.com/stwalsh4118/phanes/internal/exec"
 	"github.com/stwalsh4118/phanes/internal/log"
+	"github.com/stwalsh4118/phanes/internal/profile"
 )
 
 const (
@@ -92,17 +94,25 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Log what we're about to do (for now, just log the flags)
+	// Handle profile selection if --profile flag is set
+	var profileModules []string
 	if profileFlag != "" {
-		log.Info("Profile selected: %s", profileFlag)
+		modules, err := getProfileModules(profileFlag)
+		if err != nil {
+			return fmt.Errorf("profile selection failed: %w", err)
+		}
+		profileModules = modules
 	}
+
+	// Log what we're about to do
 	if modulesFlag != "" {
 		log.Info("Modules selected: %s", modulesFlag)
 	}
 	log.Info("Config file: %s", configFlag)
 
-	// Store config for later use (will be used in subsequent tasks)
+	// Store config and profile modules for later use (will be used in subsequent tasks)
 	_ = cfg
+	_ = profileModules
 
 	// For now, just exit successfully - actual execution will be in later tasks
 	log.Info("Flag parsing complete. Execution will be implemented in subsequent tasks.")
@@ -134,6 +144,32 @@ func loadConfig(path string) (*config.Config, error) {
 
 	log.Info("Configuration loaded successfully from %s", path)
 	return cfg, nil
+}
+
+// getProfileModules validates that a profile exists and returns its module list.
+// If the profile doesn't exist, it returns an error with a list of available profiles.
+func getProfileModules(profileName string) ([]string, error) {
+	// Validate profile exists
+	if !profile.ProfileExists(profileName) {
+		// Get available profiles for error message
+		availableProfiles := profile.ListProfiles()
+		log.Error("Profile '%s' not found", profileName)
+		log.Error("Available profiles: %s", strings.Join(availableProfiles, ", "))
+		return nil, fmt.Errorf("profile '%s' not found. Available profiles: %s", profileName, strings.Join(availableProfiles, ", "))
+	}
+
+	// Get profile modules
+	modules, err := profile.GetProfile(profileName)
+	if err != nil {
+		// This shouldn't happen since we checked ProfileExists, but handle it anyway
+		return nil, fmt.Errorf("failed to get profile '%s': %w", profileName, err)
+	}
+
+	// Log profile selection and modules
+	log.Info("Profile selected: %s", profileName)
+	log.Info("Profile modules: %s", strings.Join(modules, ", "))
+
+	return modules, nil
 }
 
 func main() {
