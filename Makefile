@@ -48,6 +48,11 @@ test-integration: ## Run integration tests only
 		echo "No integration tests found in test/integration/"; \
 	fi
 
+test-e2e: ## Run E2E tests in Docker container
+	@echo "Running E2E tests in Docker container..."
+	@docker-compose -f docker-compose.test.yml build
+	@docker-compose -f docker-compose.test.yml run --rm phanes-test go test -v ./test/integration/... -run "E2E"
+
 test-race: ## Run tests with race detector
 	@echo "Running tests with race detector..."
 	@go test -race -v ./...

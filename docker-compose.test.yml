@@ -1,0 +1,24 @@
+# Docker Compose configuration for testing Phanes
+# Usage: docker-compose -f docker-compose.test.yml run --rm phanes-test <command>
+
+services:
+  phanes-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: phanes-test:latest
+    # Run as root to allow system modifications
+    user: root
+    # Mount the source code for live development
+    volumes:
+      - .:/workspace
+      # Mount a test config file
+      - ./test-config.yaml:/workspace/test-config.yaml:ro
+    # Keep container running for interactive testing
+    stdin_open: true
+    tty: true
+    # Set working directory
+    working_dir: /workspace
+    # Override command to allow passing arguments
+    command: /bin/bash
+

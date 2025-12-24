@@ -1,0 +1,9 @@
+# Ignore files that shouldn't be copied into Docker image
+.git
+.gitignore
+*.md
+docs/
+test-config.yaml
+*.test
+.vscode/
+.idea/
