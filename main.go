@@ -17,6 +17,15 @@ import (
 	"github.com/stwalsh4118/phanes/internal/runner"
 )
 
+// Error types for exit code determination
+type usageError struct {
+	message string
+}
+
+func (e *usageError) Error() string {
+	return e.message
+}
+
 const (
 	programName = "phanes"
 	version     = "0.1.0"
@@ -63,8 +72,16 @@ func init() {
   phanes --list`
 }
 
-// runCommand executes the main command logic
-func runCommand(cmd *cobra.Command, args []string) error {
+// runCommand executes the main command logic with panic recovery
+func runCommand(cmd *cobra.Command, args []string) (err error) {
+	// Recover from panics and convert to error
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic occurred: %v", r)
+			log.Error("Unexpected panic: %v", r)
+		}
+	}()
+
 	// Set up dry-run mode for logging if flag is set
 	if dryRunFlag {
 		log.SetDryRun(true)
@@ -81,12 +98,11 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	if profileFlag == "" && modulesFlag == "" {
 		log.Error("Error: Either --profile or --modules must be specified")
 		fmt.Fprintf(os.Stderr, "\n")
-		// Return error - Cobra will show help automatically
-		return fmt.Errorf("invalid usage: either --profile or --modules must be specified")
+		// Return usage error - Cobra will show help automatically
+		return &usageError{message: "invalid usage: either --profile or --modules must be specified"}
 	}
 
 	// Basic validation: if both profile and modules are specified, that's okay
-	// (we'll handle combining them in later tasks)
 	if profileFlag != "" && modulesFlag != "" {
 		log.Warn("Both --profile and --modules specified. Profile modules will be combined with specified modules.")
 	}
@@ -94,7 +110,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	// Load configuration file
 	cfg, err := loadConfig(configFlag)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("config loading failed: %w", err)
 	}
 
 	// Handle profile selection if --profile flag is set
@@ -122,7 +138,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	// Combine profile modules and selected modules
 	modulesToExecute := combineModules(profileModules, selectedModules)
 	if len(modulesToExecute) == 0 {
-		return fmt.Errorf("no modules to execute")
+		return &usageError{message: "no modules to execute"}
 	}
 
 	log.Info("Modules to execute: %s", strings.Join(modulesToExecute, ", "))
@@ -138,7 +154,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 
 // loadConfig loads a configuration file from the given path.
 // If the file doesn't exist, it returns a default config with a warning.
-// If the file exists but is invalid, it returns an error with a clear message.
+// If the file exists but is invalid, it returns an error with a clear, actionable message.
 func loadConfig(path string) (*config.Config, error) {
 	// Check if config file exists
 	if !exec.FileExists(path) {
@@ -150,12 +166,43 @@ func loadConfig(path string) (*config.Config, error) {
 	// Load config from file
 	cfg, err := config.Load(path)
 	if err != nil {
-		// Provide clear error messages based on error type
-		if errors.Is(err, os.ErrNotExist) {
-			// This shouldn't happen since we checked FileExists, but handle it anyway
+		// Provide clear, actionable error messages based on error type
+		errStr := err.Error()
+		
+		// Check for file not found (shouldn't happen after FileExists check, but handle anyway)
+		if errors.Is(err, os.ErrNotExist) || strings.Contains(errStr, "no such file") {
+			log.Error("Config file not found: %s", path)
+			log.Error("Please ensure the config file exists at the specified path.")
 			return nil, fmt.Errorf("config file not found: %s", path)
 		}
-		// config.Load() wraps errors, so we can return them directly
+		
+		// Check for YAML parsing errors
+		if strings.Contains(errStr, "failed to parse YAML") || strings.Contains(errStr, "yaml") {
+			log.Error("Invalid YAML syntax in config file: %s", path)
+			log.Error("Error details: %v", err)
+			log.Error("Please check the YAML syntax in your config file.")
+			return nil, fmt.Errorf("invalid YAML in config file %s: %w", path, err)
+		}
+		
+		// Check for validation errors
+		if strings.Contains(errStr, "validation failed") || strings.Contains(errStr, "required") {
+			log.Error("Config validation failed: %s", path)
+			log.Error("Error details: %v", err)
+			// Provide helpful suggestions based on the error
+			if strings.Contains(errStr, "user.username") {
+				log.Error("Missing required field: user.username")
+				log.Error("Please add 'username' field under 'user' section in your config file.")
+			}
+			if strings.Contains(errStr, "user.ssh_public_key") {
+				log.Error("Missing required field: user.ssh_public_key")
+				log.Error("Please add 'ssh_public_key' field under 'user' section in your config file.")
+			}
+			return nil, fmt.Errorf("config validation failed for %s: %w", path, err)
+		}
+		
+		// Generic error fallback
+		log.Error("Failed to load config file: %s", path)
+		log.Error("Error details: %v", err)
 		return nil, fmt.Errorf("failed to load config from %s: %w", path, err)
 	}
 
@@ -172,6 +219,7 @@ func getProfileModules(profileName string) ([]string, error) {
 		availableProfiles := profile.ListProfiles()
 		log.Error("Profile '%s' not found", profileName)
 		log.Error("Available profiles: %s", strings.Join(availableProfiles, ", "))
+		log.Error("Use --list to see all available profiles and modules.")
 		return nil, fmt.Errorf("profile '%s' not found. Available profiles: %s", profileName, strings.Join(availableProfiles, ", "))
 	}
 
@@ -179,6 +227,7 @@ func getProfileModules(profileName string) ([]string, error) {
 	modules, err := profile.GetProfile(profileName)
 	if err != nil {
 		// This shouldn't happen since we checked ProfileExists, but handle it anyway
+		log.Error("Failed to get profile '%s': %v", profileName, err)
 		return nil, fmt.Errorf("failed to get profile '%s': %w", profileName, err)
 	}
 
@@ -270,7 +319,7 @@ func combineModules(profileModules []string, selectedModules []string) []string 
 
 // executeModules creates a runner instance, registers all available modules, and executes
 // the specified modules with the given configuration and dry-run flag.
-// Returns an error if module execution fails.
+// Returns an error if module execution fails, with actionable error messages.
 func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error {
 	if len(moduleNames) == 0 {
 		return fmt.Errorf("no modules specified")
@@ -282,7 +331,34 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 	// Execute modules
 	log.Info("Starting module execution...")
 	if err := r.RunModules(moduleNames, cfg, dryRun); err != nil {
-		return fmt.Errorf("failed to execute modules: %w", err)
+		errStr := err.Error()
+		
+		// Check for unknown module errors
+		if strings.Contains(errStr, "not found in registry") {
+			// Extract module name from error if possible
+			log.Error("One or more modules not found in registry")
+			log.Error("Error details: %v", err)
+			
+			// Show available modules
+			availableModules := r.ListModules()
+			sort.Strings(availableModules)
+			log.Error("Available modules: %s", strings.Join(availableModules, ", "))
+			log.Error("Use --list to see all available modules and profiles.")
+			
+			return fmt.Errorf("module execution failed: %w", err)
+		}
+		
+		// Check for module execution failures
+		if strings.Contains(errStr, "failed to execute") || strings.Contains(errStr, "module") {
+			log.Error("Module execution failed")
+			log.Error("Error details: %v", err)
+			log.Error("Check the error messages above for details about which module failed.")
+			return fmt.Errorf("module execution failed: %w", err)
+		}
+		
+		// Generic error fallback
+		log.Error("Module execution failed: %v", err)
+		return fmt.Errorf("module execution failed: %w", err)
 	}
 
 	return nil
@@ -324,12 +400,32 @@ func listProfilesAndModules() {
 }
 
 func main() {
+	// Execute command with panic recovery at top level
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("Unexpected panic: %v", r)
+			os.Exit(1)
+		}
+	}()
+
 	if err := rootCmd.Execute(); err != nil {
-		// Check if it's an invalid usage error (exit code 2)
-		if err.Error() == "invalid usage: either --profile or --modules must be specified" {
+		// Check if it's a usage error (exit code 2)
+		var usageErr *usageError
+		if errors.As(err, &usageErr) {
+			// Usage errors already logged in runCommand
 			os.Exit(2)
 		}
-		// Other errors exit with code 1
+		
+		// Check error message for usage-related errors (backup check)
+		errStr := err.Error()
+		if strings.Contains(errStr, "invalid usage") || 
+		   strings.Contains(errStr, "no modules to execute") ||
+		   strings.Contains(errStr, "either --profile or --modules") {
+			os.Exit(2)
+		}
+		
+		// All other errors exit with code 1
+		// Error messages are already logged by the error handling functions
 		os.Exit(1)
 	}
 }
