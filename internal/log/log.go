@@ -29,6 +29,13 @@ func SetDryRun(enabled bool) {
 	dryRun = enabled
 }
 
+// IsDryRun returns the current dry-run mode state in a thread-safe manner.
+func IsDryRun() bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	return dryRun
+}
+
 // isDryRun returns the current dry-run mode state in a thread-safe manner.
 func isDryRun() bool {
 	mu.RLock()
