@@ -4,13 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stwalsh4118/phanes/internal/config"
 	"github.com/stwalsh4118/phanes/internal/exec"
 	"github.com/stwalsh4118/phanes/internal/log"
+	"github.com/stwalsh4118/phanes/internal/modules/baseline"
+	"github.com/stwalsh4118/phanes/internal/modules/user"
 	"github.com/stwalsh4118/phanes/internal/profile"
+	"github.com/stwalsh4118/phanes/internal/runner"
 )
 
 const (
@@ -69,9 +73,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 
 	// Handle --list flag (show available modules and profiles, then exit)
 	if listFlag {
-		// TODO: Implement in task 8-5
-		log.Info("Listing available modules and profiles...")
-		log.Warn("List functionality will be implemented in a future task")
+		listProfilesAndModules()
 		return nil
 	}
 
@@ -218,6 +220,54 @@ func parseModuleList(moduleStr string) ([]string, error) {
 	log.Info("Modules selected: %s", strings.Join(modules, ", "))
 
 	return modules, nil
+}
+
+// registerAllModules creates a runner instance and registers all available modules.
+// This function is used for listing modules and can be reused for module execution.
+func registerAllModules() *runner.Runner {
+	r := runner.NewRunner()
+
+	// Register all available modules
+	// Note: As more modules are implemented, they should be added here
+	r.RegisterModule(&baseline.BaselineModule{})
+	r.RegisterModule(&user.UserModule{})
+
+	return r
+}
+
+// listProfilesAndModules displays all available profiles and modules in a user-friendly format.
+// It lists profiles with their module lists, and all registered modules with their descriptions.
+func listProfilesAndModules() {
+	// Register all modules to get access to the module registry
+	r := registerAllModules()
+
+	// List profiles
+	log.Info("Available Profiles:")
+	profiles := profile.ListProfiles()
+	for _, profileName := range profiles {
+		modules, err := profile.GetProfile(profileName)
+		if err != nil {
+			// This shouldn't happen since ListProfiles() only returns valid profiles
+			log.Error("Failed to get profile %s: %v", profileName, err)
+			continue
+		}
+		log.Info("  - %s: %s", profileName, strings.Join(modules, ", "))
+	}
+
+	// Add blank line between sections
+	fmt.Println()
+
+	// List modules
+	log.Info("Available Modules:")
+	moduleNames := r.ListModules()
+	// Sort module names for consistent output
+	sort.Strings(moduleNames)
+	for _, moduleName := range moduleNames {
+		mod := r.GetModule(moduleName)
+		if mod != nil {
+			log.Info("  - %s: %s", moduleName, mod.Description())
+		}
+	}
 }
 
 func main() {

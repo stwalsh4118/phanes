@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	sshDirPerm     = 0700
+	sshDirPerm         = 0700
 	authorizedKeysPerm = 0600
-	sudoersPerm   = 0440
+	sudoersPerm        = 0440
 )
 
 // UserModule implements the Module interface for user creation and SSH key setup.
@@ -293,4 +293,3 @@ func (m *UserModule) Install(cfg *config.Config) error {
 
 // Ensure UserModule implements the Module interface
 var _ module.Module = (*UserModule)(nil)
-
