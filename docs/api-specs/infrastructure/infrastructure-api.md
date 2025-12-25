@@ -2118,3 +2118,100 @@ The module uses the following configuration fields:
 - `bufio` - Reading Redis config file
 - `strings` - String operations
 
+## DevTools Module - Core Tools
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
+
+Implements helper functions for installing core development tools (Git, build-essential, curl, wget, ca-certificates) via apt. These functions are used by the main DevTools module orchestrator.
+
+### Public Functions
+
+```go
+// installCoreTools installs core development tools via apt.
+// Installs: git, build-essential, curl, wget, ca-certificates
+// Returns an error if installation fails.
+func installCoreTools(cfg *config.Config) error
+
+// coreToolsInstalled checks if all core tools are installed.
+// Returns true only if ALL tools are installed.
+func coreToolsInstalled() (bool, error)
+
+// gitInstalled checks if Git is installed.
+func gitInstalled() (bool, error)
+
+// buildEssentialInstalled checks if build-essential package is installed.
+// Verifies the package and that gcc and make are available.
+func buildEssentialInstalled() (bool, error)
+
+// curlInstalled checks if curl is installed.
+func curlInstalled() (bool, error)
+
+// wgetInstalled checks if wget is installed.
+func wgetInstalled() (bool, error)
+
+// caCertificatesInstalled checks if ca-certificates package is installed.
+func caCertificatesInstalled() (bool, error)
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/devtools"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Check if core tools are installed
+installed, err := devtools.coreToolsInstalled()
+if err != nil {
+    log.Error("Failed to check core tools: %v", err)
+    return
+}
+
+if !installed {
+    // Install core tools
+    cfg := config.DefaultConfig()
+    if err := devtools.installCoreTools(cfg); err != nil {
+        log.Error("Failed to install core tools: %v", err)
+        return
+    }
+    log.Success("Core tools installed")
+} else {
+    log.Skip("Core tools already installed")
+}
+```
+
+### Behavior
+
+- **Package Installation**: Installs packages via apt (`apt-get install -y git build-essential curl wget ca-certificates`). Updates package list first, then installs all packages in a single command.
+- **Installation Checks**: 
+  - Uses `exec.CommandExists()` for binary checks (git, curl, wget)
+  - Uses `dpkg -l` for package checks (build-essential, ca-certificates)
+  - Verifies `gcc` and `make` are available for build-essential
+- **Idempotency**: `coreToolsInstalled()` checks if all tools are installed. `installCoreTools()` returns early with `log.Skip()` if all tools are already installed.
+- **Error Handling**: Returns descriptive errors if apt update fails, package installation fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, and `log.Skip()` when tools are already installed.
+
+### Commands Used
+
+- `apt-get update` - Update package list
+- `apt-get install -y git build-essential curl wget ca-certificates` - Install core development tools
+- `dpkg -l <package>` - Check if package is installed
+- `which <command>` - Check if command exists (via exec.CommandExists)
+
+### Packages Installed
+
+- `git` - Version control system
+- `build-essential` - GCC, make, and other build tools
+- `curl` - HTTP client
+- `wget` - File downloader
+- `ca-certificates` - SSL certificates
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `strings` - String operations
+
