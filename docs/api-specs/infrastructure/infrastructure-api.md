@@ -2215,3 +2215,219 @@ if !installed {
 - `github.com/stwalsh4118/phanes/internal/log` - Logging functions
 - `strings` - String operations
 
+## DevTools Module - Node.js via nvm
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
+
+Implements helper functions for installing nvm (Node Version Manager) and Node.js per-user. nvm is installed in the user's home directory (`~/.nvm`) and requires shell profile configuration.
+
+### Public Functions
+
+```go
+// installNodeJS installs nvm and Node.js for the configured user.
+// Installs nvm to ~/.nvm and configures shell profiles (.bashrc, .zshrc).
+// Uses cfg.User.Username (required) and cfg.DevTools.NodeVersion (defaults to "22").
+// Returns an error if installation fails.
+func installNodeJS(cfg *config.Config) error
+
+// nvmInstalled checks if nvm is installed for a specific user.
+// Checks if ~/.nvm directory and nvm.sh script exist.
+func nvmInstalled(username string) (bool, error)
+
+// nodeInstalled checks if a Node.js version is installed via nvm for a user.
+// Uses nvm which to check if the version is installed.
+func nodeInstalled(username, version string) (bool, error)
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/devtools"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Check if nvm is installed
+installed, err := devtools.nvmInstalled("myuser")
+if err != nil {
+    log.Error("Failed to check nvm: %v", err)
+    return
+}
+
+if !installed {
+    // Install nvm and Node.js
+    cfg := config.DefaultConfig()
+    cfg.User.Username = "myuser"
+    cfg.DevTools.NodeVersion = "22"
+    if err := devtools.installNodeJS(cfg); err != nil {
+        log.Error("Failed to install Node.js: %v", err)
+        return
+    }
+    log.Success("Node.js installed")
+} else {
+    log.Skip("nvm already installed")
+}
+```
+
+### Behavior
+
+- **nvm Installation**: Downloads and runs the official nvm install script (`curl -o- <url> | bash`) as the target user. Installs to `~/.nvm` directory. Uses nvm version v0.40.0.
+- **Shell Profile Configuration**: Appends nvm initialization to `.bashrc` and `.zshrc` if not already present. Initialization includes:
+  - `export NVM_DIR="$HOME/.nvm"`
+  - `[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"`
+  - `[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"`
+- **Node.js Installation**: Uses nvm to install the specified Node.js version (defaults to "22"). Sets the version as default using `nvm alias default <version>`. Verifies installation with `node --version` and `npm --version`.
+- **Installation Checks**: 
+  - `nvmInstalled()` checks if `~/.nvm` directory and `nvm.sh` script exist
+  - `nodeInstalled()` uses `nvm which <version>` to check if a specific version is installed
+- **Idempotency**: `installNodeJS()` checks if nvm and Node.js are already installed before installing. Returns early with `log.Skip()` if already configured.
+- **Error Handling**: Validates username is set (warns and skips if not). Returns descriptive errors if nvm installation fails, shell profile configuration fails, Node.js installation fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files.
+- **User Context**: All commands run as the target user using `su - <username> -c "<command>"` to ensure proper environment and file ownership.
+- **File Ownership**: Sets correct ownership on shell profile files using `os.Chown()` with the user's UID/GID.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, `log.Skip()` when already installed, and `log.Warn()` if username is not set.
+
+### Commands Used
+
+- `su - <username> -c "curl -o- <nvm-url> | bash"` - Install nvm as the user
+- `su - <username> -c "source ~/.nvm/nvm.sh && nvm install <version>"` - Install Node.js via nvm
+- `su - <username> -c "source ~/.nvm/nvm.sh && nvm alias default <version>"` - Set default Node.js version
+- `su - <username> -c "source ~/.nvm/nvm.sh && nvm which <version>"` - Check if Node.js version is installed
+- `su - <username> -c "source ~/.nvm/nvm.sh && node --version && npm --version"` - Verify Node.js installation
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.User.Username` - Username for installing nvm and Node.js (required)
+- `config.DevTools.NodeVersion` - Node.js version to install (defaults to "22" if empty)
+
+### Files Created/Modified
+
+- `~/.nvm/` - nvm installation directory (created by nvm install script)
+- `~/.bashrc` - Shell profile with nvm initialization appended
+- `~/.zshrc` - Shell profile with nvm initialization appended
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations and ownership
+- `os/user` - User lookup for UID/GID
+- `path/filepath` - Path operations
+- `strconv` - String to integer conversion
+- `strings` - String operations
+
+## DevTools Module - Main Orchestrator
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
+
+Implements the main DevTools module that orchestrates installation of all development tools. This module implements the `module.Module` interface and can be run via the CLI.
+
+### Public Types
+
+```go
+// DevToolsModule implements the Module interface for development tools installation.
+// It orchestrates the installation of core tools, Node.js via nvm, Python/uv, and Go.
+type DevToolsModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "devtools"
+func (m *DevToolsModule) Name() string
+
+// Description returns "Installs development tools (Git, build-essential, Node.js, Python, Go)"
+func (m *DevToolsModule) Description() string
+
+// IsInstalled checks if development tools are already installed.
+// Returns true if all enabled components are installed.
+func (m *DevToolsModule) IsInstalled() (bool, error)
+
+// Install orchestrates the installation of all development tools.
+// Respects cfg.DevTools.Enabled flag - if false, skips installation.
+func (m *DevToolsModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/devtools"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Register module with runner
+mod := &devtools.DevToolsModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Execute via runner
+err = r.RunModules([]string{"devtools"}, cfg, false)
+if err != nil {
+    log.Error("Failed to run devtools: %v", err)
+}
+```
+
+### CLI Usage
+
+```bash
+# Run devtools module directly
+./phanes --modules devtools --config config.yaml
+
+# Run as part of dev profile
+./phanes --profile dev --config config.yaml
+
+# Dry-run to preview
+./phanes --modules devtools --config config.yaml --dry-run
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.DevTools.Enabled` - Whether to install development tools (defaults to `true`)
+- `config.DevTools.NodeVersion` - Node.js version to install (defaults to "22")
+- `config.DevTools.PythonVersion` - Python version to install (defaults to "3") [planned]
+- `config.DevTools.GoVersion` - Go version to install (defaults to "1.24") [planned]
+- `config.DevTools.InstallUv` - Whether to install uv package manager (defaults to `true`) [planned]
+- `config.User.Username` - Required for per-user installations (nvm, etc.)
+
+### Behavior
+
+- **Orchestration**: Installs components in order: core tools → Node.js → Python → Go. Stops on first error.
+- **Core Tools**: Installs git, build-essential, curl, wget, ca-certificates via apt.
+- **Node.js**: Installs nvm per-user in `~/.nvm`, then installs specified Node.js version.
+- **Python**: [Planned] Installs system Python and optionally uv package manager.
+- **Go**: [Planned] Installs Go from official source.
+- **Enabled Flag**: Respects `cfg.DevTools.Enabled` - if false, skips installation with `log.Skip()`.
+- **Idempotency**: Each sub-component checks if already installed before installing.
+- **Error Handling**: Returns descriptive errors indicating which component failed.
+- **Dry-Run Support**: Propagates dry-run mode to all sub-installations.
+- **Logging**: Uses `log.Info()` for progress, `log.Success()` for completion, `log.Skip()` when disabled or already installed.
+
+### Components Installed
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| Core Tools | ✅ Implemented | git, build-essential, curl, wget, ca-certificates |
+| Node.js/nvm | ✅ Implemented | nvm + Node.js LTS per-user |
+| Python/uv | 🔲 Planned | System Python + uv package manager |
+| Go | 🔲 Planned | Go from official source |
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+
