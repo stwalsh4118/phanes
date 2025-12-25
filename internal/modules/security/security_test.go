@@ -158,9 +158,9 @@ PubkeyAuthentication yes`
 
 func TestNormalizeSSHConfig(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   string
+		name  string
+		input string
+		want  string
 	}{
 		{
 			name:  "config with comments",
@@ -396,4 +396,3 @@ func TestSecurityModule_TemplateRendering(t *testing.T) {
 		t.Error("Rendered fail2ban config should contain enabled = true")
 	}
 }
-
