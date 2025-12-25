@@ -1600,3 +1600,117 @@ The module does not require any configuration fields. It uses Netdata defaults:
 - `os` - File operations
 - `strings` - String operations
 
+## Nginx Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/nginx`
+
+Implements the Nginx web server installation module that installs Nginx via apt, configures the service, and verifies it is running and accessible on port 80. This provides HTTP/HTTPS serving capabilities for web applications.
+
+### Public Types
+
+```go
+// NginxModule implements the Module interface for Nginx web server installation.
+type NginxModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "nginx"
+func (m *NginxModule) Name() string
+
+// Description returns "Installs and configures Nginx web server"
+func (m *NginxModule) Description() string
+
+// IsInstalled checks if Nginx is already installed and configured.
+// Verifies that Nginx is installed, service is running, and port 80 is accessible.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *NginxModule) IsInstalled() (bool, error)
+
+// Install installs and configures Nginx web server.
+// Uses cfg.Nginx.Enabled (defaults to false) - skips installation if disabled.
+func (m *NginxModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/nginx"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register nginx module
+mod := &nginx.NginxModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install Nginx
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Nginx: %v", err)
+        return
+    }
+    log.Success("Nginx installation completed")
+} else {
+    log.Skip("Nginx already installed")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Nginx.Enabled` - Whether to install Nginx (defaults to `false`)
+
+### Behavior
+
+- **Package Installation**: Installs Nginx via apt (`apt-get install -y nginx`). Updates package list first, then installs nginx package, and verifies installation with `nginx -v`.
+- **Service Configuration**: Enables Nginx service to start on boot using `systemctl enable nginx`. Starts the service if not running using `systemctl start nginx`. Verifies service is running after start.
+- **Port Verification**: Checks if Nginx is listening on port 80 using `ss -tlnp` (or `netstat -tlnp` as fallback). Logs access URL: `http://localhost`.
+- **Port Conflict Detection**: Before installation, checks if port 80 is already in use by another service. If so, logs a warning but proceeds with installation (user may have configured it intentionally).
+- **Idempotency**: `IsInstalled()` checks if Nginx is installed, service is running, and port is accessible. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Returns descriptive errors if apt update fails, nginx installation fails, service start/enable fails, or port check fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands. Still performs checks (Nginx installed, etc.).
+- **Configuration Flag**: Respects `cfg.Nginx.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation.
+- **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when port conflicts are detected, and `log.Error()` for errors.
+
+### Commands Used
+
+- `apt-get update` - Update package list
+- `apt-get install -y nginx` - Install nginx package
+- `nginx -v` - Verify nginx installation
+- `systemctl enable nginx` - Enable Nginx service
+- `systemctl start nginx` - Start Nginx service
+- `systemctl is-active nginx` - Check Nginx service status
+- `systemctl is-enabled nginx` - Check if Nginx service is enabled
+- `ss -tlnp` or `netstat -tlnp` - Check if port 80 is listening
+
+### File Operations
+
+- Checks for `/usr/sbin/nginx` binary to verify installation
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `strings` - String operations
+
