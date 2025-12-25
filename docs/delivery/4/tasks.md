@@ -8,6 +8,5 @@ This document lists all tasks associated with PBI 4.
 
 | Task ID | Name | Status | Description |
 | :------ | :--- | :----- | :---------- |
-| 4-1 | [Implement Docker module](./4-1.md) | Proposed | Create module for Docker CE and Docker Compose v2 installation |
-| 4-2 | [Implement monitoring module](./4-2.md) | Proposed | Create module for Netdata installation and configuration |
-
+| 4-1 | [Implement Docker module](./4-1.md) | Done | Create module for Docker CE and Docker Compose v2 installation with user group configuration |
+| 4-2 | [Implement Netdata monitoring module](./4-2.md) | Proposed | Create module for Netdata installation and configuration using the official kickstart script |
