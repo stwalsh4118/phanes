@@ -1840,3 +1840,140 @@ The module uses the following configuration fields:
 - `os` - File operations
 - `strings` - String operations
 
+## PostgreSQL Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/postgres`
+
+Implements the PostgreSQL database server installation module that installs PostgreSQL via the official APT repository, creates initial database and user, configures the service, and verifies it is running and accessible on port 5432. This provides relational database capabilities for applications.
+
+### Public Types
+
+```go
+// PostgresModule implements the Module interface for PostgreSQL installation.
+type PostgresModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "postgres"
+func (m *PostgresModule) Name() string
+
+// Description returns "Installs and configures PostgreSQL database server"
+func (m *PostgresModule) Description() string
+
+// IsInstalled checks if PostgreSQL is already installed and configured.
+// Verifies that PostgreSQL is installed, service is running, and port 5432 is accessible.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *PostgresModule) IsInstalled() (bool, error)
+
+// Install installs and configures PostgreSQL database server.
+// Uses cfg.Postgres.Enabled (defaults to true), cfg.Postgres.Version (defaults to "16"),
+// cfg.Postgres.Password (required), cfg.Postgres.Database (defaults to "phanes"),
+// and cfg.Postgres.User (defaults to "phanes").
+func (m *PostgresModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/postgres"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register postgres module
+mod := &postgres.PostgresModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install PostgreSQL
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install PostgreSQL: %v", err)
+        return
+    }
+    log.Success("PostgreSQL installation completed")
+} else {
+    log.Skip("PostgreSQL already installed")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Postgres.Enabled` - Whether to install PostgreSQL (defaults to `true`)
+- `config.Postgres.Version` - PostgreSQL version to install (defaults to `"16"`)
+- `config.Postgres.Password` - Password for the database user (required)
+- `config.Postgres.Database` - Database name to create (defaults to `"phanes"`)
+- `config.Postgres.User` - Database user name to create (defaults to `"phanes"`)
+
+### Behavior
+
+- **Repository Setup**: Adds PostgreSQL's official APT repository by installing prerequisites (`wget`, `ca-certificates`), downloading GPG key from `https://www.postgresql.org/media/keys/ACCC4CF8.asc`, adding repository source, and updating package list.
+- **Package Installation**: Installs PostgreSQL via apt (`apt-get install -y postgresql-<version>`) from the official repository and verifies installation with `psql --version`.
+- **Service Configuration**: Enables PostgreSQL service to start on boot using `systemctl enable postgresql`. Starts the service if not running using `systemctl start postgresql`. Verifies service is running after start.
+- **Database Creation**: Creates initial database (from config, default "phanes") if it doesn't exist using `psql -U postgres -c "CREATE DATABASE <database>;"`.
+- **User Creation**: Creates database user (from config, default "phanes") with password if it doesn't exist using `psql -U postgres -c "CREATE USER <user> WITH PASSWORD '<password>';"`. Password is passed securely via command (not logged).
+- **Privilege Granting**: Grants all privileges on the database to the user using `psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE <database> TO <user>;"`.
+- **Port Verification**: Checks if PostgreSQL is listening on port 5432 using `ss -tlnp` (or `netstat -tlnp` as fallback). Logs connection details after successful installation (without password).
+- **Idempotency**: `IsInstalled()` checks if PostgreSQL is installed, service is running, and port is accessible. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Validates password is not empty before proceeding. Returns descriptive errors if GPG key download fails, repository addition fails, apt update fails, PostgreSQL installation fails, database/user creation fails, service start/enable fails, or port check fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands. Still performs checks (PostgreSQL installed, etc.).
+- **Configuration Flag**: Respects `cfg.Postgres.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation. Set to `false` in config to disable the module when included in a profile.
+- **Password Security**: Never logs passwords in any form. Uses secure command execution for password handling. Logs connection details without password after installation.
+- **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when port is not yet accessible, and `log.Error()` for errors. Shows connection details after successful installation.
+
+### Commands Used
+
+- `apt-get update` - Update package list
+- `apt-get install -y wget ca-certificates` - Install prerequisites
+- `wget --quiet -O - <gpg-url> | gpg --dearmor -o <keyring>` - Add GPG key
+- `lsb_release -cs` or `/etc/os-release` - Get distribution codename
+- `apt-get install -y postgresql-<version>` - Install PostgreSQL package
+- `psql --version` - Verify PostgreSQL installation
+- `systemctl enable postgresql` - Enable PostgreSQL service
+- `systemctl start postgresql` - Start PostgreSQL service
+- `systemctl is-active postgresql` - Check PostgreSQL service status
+- `systemctl is-enabled postgresql` - Check if PostgreSQL service is enabled
+- `psql -U postgres -lqt` - List databases
+- `psql -U postgres -c "CREATE DATABASE <database>;"` - Create database
+- `psql -U postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='<user>'"` - Check if user exists
+- `psql -U postgres -c "CREATE USER <user> WITH PASSWORD '<password>';"` - Create user
+- `psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE <database> TO <user>;"` - Grant privileges
+- `ss -tlnp` or `netstat -tlnp` - Check if port 5432 is listening
+
+### File Operations
+
+- Creates `/usr/share/keyrings/postgresql-archive-keyring.gpg` with GPG keyring
+- Creates `/etc/apt/sources.list.d/pgdg.list` with repository entry
+- Checks for `/usr/bin/psql` binary to verify installation
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations and environment variables
+- `os/exec` - Command execution with environment variables
+- `bufio` - Reading /etc/os-release
+- `strings` - String operations
+
