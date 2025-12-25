@@ -78,9 +78,11 @@ type Caddy struct {
 
 // DevTools contains development tools configuration.
 type DevTools struct {
+	Enabled       bool   `yaml:"enabled"`
 	NodeVersion   string `yaml:"node_version"`
 	PythonVersion string `yaml:"python_version"`
 	GoVersion     string `yaml:"go_version"`
+	InstallUv     bool   `yaml:"install_uv"`
 }
 
 // Coolify contains Coolify configuration.
@@ -128,9 +130,11 @@ func DefaultConfig() *Config {
 			Enabled: true,
 		},
 		DevTools: DevTools{
-			NodeVersion:   "20",
-			PythonVersion: "3.12",
-			GoVersion:     "1.25",
+			Enabled:       true,
+			NodeVersion:   "22",
+			PythonVersion: "3",
+			GoVersion:     "1.24",
+			InstallUv:     true,
 		},
 		Coolify: Coolify{
 			Enabled: true,

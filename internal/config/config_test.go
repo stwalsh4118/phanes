@@ -37,14 +37,20 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Postgres.Version != "16" {
 		t.Errorf("Expected Postgres version 16, got %q", cfg.Postgres.Version)
 	}
-	if cfg.DevTools.NodeVersion != "20" {
-		t.Errorf("Expected Node version 20, got %q", cfg.DevTools.NodeVersion)
+	if !cfg.DevTools.Enabled {
+		t.Error("Expected DevTools enabled by default")
 	}
-	if cfg.DevTools.PythonVersion != "3.12" {
-		t.Errorf("Expected Python version 3.12, got %q", cfg.DevTools.PythonVersion)
+	if cfg.DevTools.NodeVersion != "22" {
+		t.Errorf("Expected Node version 22, got %q", cfg.DevTools.NodeVersion)
 	}
-	if cfg.DevTools.GoVersion != "1.25" {
-		t.Errorf("Expected Go version 1.25, got %q", cfg.DevTools.GoVersion)
+	if cfg.DevTools.PythonVersion != "3" {
+		t.Errorf("Expected Python version 3, got %q", cfg.DevTools.PythonVersion)
+	}
+	if cfg.DevTools.GoVersion != "1.24" {
+		t.Errorf("Expected Go version 1.24, got %q", cfg.DevTools.GoVersion)
+	}
+	if !cfg.DevTools.InstallUv {
+		t.Error("Expected InstallUv enabled by default")
 	}
 	if !cfg.Nginx.Enabled {
 		t.Error("Expected Nginx enabled by default")
@@ -334,7 +340,7 @@ devtools:
 	if cfg.Swap.Size != "2G" {
 		t.Errorf("Expected default swap size '2G', got %q", cfg.Swap.Size)
 	}
-	if cfg.DevTools.PythonVersion != "3.12" {
-		t.Errorf("Expected default Python version '3.12', got %q", cfg.DevTools.PythonVersion)
+	if cfg.DevTools.PythonVersion != "3" {
+		t.Errorf("Expected default Python version '3', got %q", cfg.DevTools.PythonVersion)
 	}
 }
