@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	defaultSwapFilePath   = "/swapfile"
-	defaultSwappiness     = 10
+	defaultSwapFilePath  = "/swapfile"
+	defaultSwappiness    = 10
 	swappinessConfigPath = "/etc/sysctl.d/99-swappiness.conf"
-	fstabPath             = "/etc/fstab"
+	fstabPath            = "/etc/fstab"
 )
 
 // SwapModule implements the Module interface for swap file creation and configuration.
@@ -409,4 +409,3 @@ func (m *SwapModule) Install(cfg *config.Config) error {
 
 // Ensure SwapModule implements the Module interface
 var _ module.Module = (*SwapModule)(nil)
-
