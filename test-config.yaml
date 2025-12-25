@@ -1,5 +1,5 @@
 user:
   username: "testuser"
-  ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7vbqajDhA/2dP7pthm3dkmX1dztM1a1Qh2tQ8XvJzKpLqM8N9oP0qR1sT2uV3wX4yZ5aA6bB7cC8dD9eE0fF1gG2hH3iI4jJ5kK6lL7mM8nN9oO0pP1qQ2rR3sS4tT5uU6vV7wW8xX9yY0zZ test@example.com"
+  ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAFFmdSOzAzu92yXjlKoB9NEvFLq7ubY/csOD6zamt9j sean@seanspc"
 system:
   timezone: "UTC"

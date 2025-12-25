@@ -1,9 +1,12 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Simplified Vagrantfile for WSL compatibility
-# Avoids rsync (which doesn't work with password auth in WSL)
-# Files are copied manually after VM is ready
+# Vagrantfile optimized for running Vagrant natively on Windows
+# (even when developing in WSL)
+
+# Get the project root - works whether called from Windows or WSL
+vagrant_dir = File.dirname(__FILE__)
+project_root = File.expand_path(File.join(vagrant_dir, "..", ".."))
 
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-22.04"
@@ -18,8 +21,14 @@ Vagrant.configure("2") do |config|
   # Network - forward SSH port
   config.vm.network "forwarded_port", guest: 22, host: 2222, id: "ssh"
   
-  # DISABLE all synced folders - we'll copy files manually
+  # Disable default /vagrant synced folder
   config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  # Sync project files using rsync
+  # This works when Vagrant runs natively on Windows
+  config.vm.synced_folder project_root, "/workspace",
+    type: "rsync",
+    rsync__exclude: [".git/", "test/vm/.vagrant/", ".vagrant/", "*.log"]
   
   # Provision VM with Go and dependencies
   config.vm.provision "shell", inline: <<-SHELL
@@ -55,24 +64,13 @@ Vagrant.configure("2") do |config|
     # Generate locale
     locale-gen en_US.UTF-8
     
-    # Ensure password auth is enabled for SSH (WSL compatibility)
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    echo "vagrant:vagrant" | chpasswd
-    systemctl restart sshd || service ssh restart
-    
-    # Create workspace directory
-    mkdir -p /workspace
-    chown vagrant:vagrant /workspace
+    # Set correct ownership for workspace
+    chown -R vagrant:vagrant /workspace
     
     echo "=== Provisioning complete ==="
     echo "Go version: $(go version)"
   SHELL
   
-  # SSH configuration
-  config.ssh.username = "vagrant"
-  config.ssh.password = "vagrant"
-  config.ssh.insert_key = false
-  config.ssh.connect_timeout = 120
-  config.ssh.verify_host_key = :never
+  # SSH configuration - let Vagrant handle keys automatically
+  config.ssh.insert_key = true
 end
