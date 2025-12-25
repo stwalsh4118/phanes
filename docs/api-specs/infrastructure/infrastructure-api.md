@@ -1099,3 +1099,130 @@ The module uses embedded templates for configuration files. Templates are locate
 - `os` - File operations
 - `bytes` - Template output buffering
 
+## Swap Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/swap`
+
+Implements the swap file creation and configuration module that creates a swap file, configures it in `/etc/fstab` for persistence, and sets swappiness. This helps servers handle memory pressure gracefully.
+
+### Public Types
+
+```go
+// SwapModule implements the Module interface for swap file creation and configuration.
+type SwapModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "swap"
+func (m *SwapModule) Name() string
+
+// Description returns "Creates and configures swap file"
+func (m *SwapModule) Description() string
+
+// IsInstalled checks if swap configuration is already applied.
+// Verifies that swap is active, swap file exists, fstab contains swap entry, and swappiness is set.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *SwapModule) IsInstalled() (bool, error)
+
+// Install creates and configures the swap file.
+// Uses cfg.Swap.Enabled (defaults to true) and cfg.Swap.Size (defaults to "2G").
+func (m *SwapModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/swap"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register swap module
+mod := &swap.SwapModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install swap configuration
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install swap: %v", err)
+        return
+    }
+    log.Success("Swap configuration installed")
+} else {
+    log.Skip("Swap already configured")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Swap.Enabled` - Whether to create swap (defaults to `true`)
+- `config.Swap.Size` - Size of swap file in format "2G", "512M", "1T" (defaults to `"2G"`)
+
+### Behavior
+
+- **Swap File Creation**: Creates swap file at `/swapfile` using `fallocate` (preferred) or `dd` as fallback. Sets permissions to 600, formats with `mkswap`, and enables with `swapon`. Shows progress logging for large swap files.
+- **Fstab Configuration**: Adds swap entry to `/etc/fstab` for persistence: `/swapfile none swap sw 0 0`. Checks if entry already exists before adding.
+- **Swappiness**: Sets swappiness to 10 (server-optimized value) both at runtime (`sysctl vm.swappiness=10`) and persistently via `/etc/sysctl.d/99-swappiness.conf`.
+- **Idempotency**: `IsInstalled()` checks if swap is active, swap file exists, fstab contains swap entry, and swappiness is set. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Validates swap size format before proceeding. Returns descriptive errors if swap file creation fails (disk space, permissions), fstab write fails, or swappiness setting fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files. Still performs checks (swap exists, etc.).
+- **Swap Disabled**: If `cfg.Swap.Enabled` is false, logs skip message and returns without creating swap. Still checks/configures if swap already exists.
+- **Logging**: Uses `log.Info()` for progress messages (especially for large swap file creation), `log.Success()` for completion, `log.Skip()` for already-configured items, and `log.Error()` for errors.
+
+### Size Format
+
+Swap size supports the following formats (case-insensitive):
+- `M` or `m` - Megabytes (multiply by 1024^2)
+- `G` or `g` - Gigabytes (multiply by 1024^3)
+- `T` or `t` - Terabytes (multiply by 1024^4)
+
+Examples: `"2G"`, `"512M"`, `"1T"`, `"1.5G"`
+
+### Commands Used
+
+- `fallocate -l <size> <file>` - Create swap file (preferred method)
+- `dd if=/dev/zero of=<file> bs=1M count=<size>` - Create swap file (fallback)
+- `chmod 600 <file>` - Set swap file permissions
+- `mkswap <file>` - Format file as swap
+- `swapon <file>` - Enable swap
+- `swapon --show` - Check active swap
+- `sysctl vm.swappiness=<value>` - Set swappiness runtime value
+
+### File Operations
+
+- Creates `/swapfile` with permissions 600
+- Appends to `/etc/fstab` with swap entry: `/swapfile none swap sw 0 0`
+- Creates `/etc/sysctl.d/99-swappiness.conf` with: `vm.swappiness=10`
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `bufio` - Reading fstab
+- `strconv` - Parsing size strings
+- `strings` - String operations
+
