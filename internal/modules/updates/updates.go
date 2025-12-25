@@ -333,4 +333,3 @@ func (m *UpdatesModule) Install(cfg *config.Config) error {
 
 // Ensure UpdatesModule implements the Module interface
 var _ module.Module = (*UpdatesModule)(nil)
-
