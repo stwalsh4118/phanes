@@ -1226,3 +1226,128 @@ Examples: `"2G"`, `"512M"`, `"1T"`, `"1.5G"`
 - `strconv` - Parsing size strings
 - `strings` - String operations
 
+## Updates Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/updates`
+
+Implements the automatic security updates configuration module that installs and configures `unattended-upgrades` for automatic security updates. This ensures servers stay patched with security updates automatically.
+
+### Public Types
+
+```go
+// UpdatesModule implements the Module interface for automatic security updates configuration.
+type UpdatesModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "updates"
+func (m *UpdatesModule) Name() string
+
+// Description returns "Configures automatic security updates"
+func (m *UpdatesModule) Description() string
+
+// IsInstalled checks if updates configuration is already applied.
+// Verifies that unattended-upgrades package is installed and configuration files are correctly set.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *UpdatesModule) IsInstalled() (bool, error)
+
+// Install installs and configures unattended-upgrades for automatic security updates.
+// No config fields are required - uses sensible defaults.
+func (m *UpdatesModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/updates"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register updates module
+mod := &updates.UpdatesModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install updates configuration
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install updates: %v", err)
+        return
+    }
+    log.Success("Updates configuration installed")
+} else {
+    log.Skip("Updates already configured")
+}
+```
+
+### Configuration
+
+The module does not require any configuration fields. It uses sensible defaults:
+- Automatic security updates enabled
+- Automatic reboot disabled (per PRD)
+- Auto-remove unused dependencies enabled
+- Daily update checks
+
+### Behavior
+
+- **Package Installation**: Installs `unattended-upgrades` package using `apt-get install -y unattended-upgrades`. Checks if package is already installed before attempting installation.
+- **50unattended-upgrades Configuration**: Creates `/etc/apt/apt.conf.d/50unattended-upgrades` with security update origins enabled, auto-remove unused dependencies enabled, and automatic reboot disabled. Configures security update origins for the distribution.
+- **20auto-upgrades Configuration**: Creates `/etc/apt/apt.conf.d/20auto-upgrades` with daily automatic updates enabled (`APT::Periodic::Update-Package-Lists "1"` and `APT::Periodic::Unattended-Upgrade "1"`).
+- **Configuration Verification**: Optionally runs `unattended-upgrades --dry-run --debug` to verify configuration after installation.
+- **Idempotency**: `IsInstalled()` checks if package is installed and config files match expected content. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Returns descriptive errors if package installation fails, config file write fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, `log.Skip()` for already-configured items, and `log.Error()` for errors. Informs user that automatic reboot is disabled by default.
+
+### Configuration Files
+
+- **`/etc/apt/apt.conf.d/50unattended-upgrades`**: Configures what gets updated and how
+  - Security update origins enabled
+  - Auto-remove unused dependencies enabled
+  - Automatic reboot disabled (`Unattended-Upgrade::Automatic-Reboot "false"`)
+- **`/etc/apt/apt.conf.d/20auto-upgrades`**: Enables automatic updates
+  - `APT::Periodic::Update-Package-Lists "1"` - Daily package list updates
+  - `APT::Periodic::Unattended-Upgrade "1"` - Daily automatic upgrades
+  - `APT::Periodic::Download-Upgradeable-Packages "1"` - Download upgradeable packages
+  - `APT::Periodic::AutocleanInterval "7"` - Weekly autoclean
+
+### Commands Used
+
+- `apt-get install -y unattended-upgrades` - Install unattended-upgrades package
+- `dpkg -l unattended-upgrades` - Check if package is installed
+- `unattended-upgrades --dry-run --debug` - Verify configuration (optional)
+
+### File Operations
+
+- Creates `/etc/apt/apt.conf.d/50unattended-upgrades` with permissions 0644
+- Creates `/etc/apt/apt.conf.d/20auto-upgrades` with permissions 0644
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `bufio` - Reading config files
+- `strings` - String operations
+

@@ -12,5 +12,5 @@ This document lists all tasks associated with PBI 3.
 | 3-2 | [Implement user module](./3-2.md) | Done | Create module for non-root user creation, SSH key setup, and sudoers configuration |
 | 3-3 | [Implement security module](./3-3.md) | Done | Create module for UFW, fail2ban, and SSH hardening with embedded templates |
 | 3-4 | [Implement swap module](./3-4.md) | Done | Create module for swap file creation and /etc/fstab configuration |
-| 3-5 | [Implement updates module](./3-5.md) | Proposed | Create module for unattended-upgrades configuration |
+| 3-5 | [Implement updates module](./3-5.md) | Done | Create module for unattended-upgrades configuration |
 
