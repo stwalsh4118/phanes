@@ -341,4 +341,3 @@ func (m *DockerModule) Install(cfg *config.Config) error {
 
 // Ensure DockerModule implements the Module interface
 var _ module.Module = (*DockerModule)(nil)
-
