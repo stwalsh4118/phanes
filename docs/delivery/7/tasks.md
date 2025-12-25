@@ -9,7 +9,7 @@ This document lists all tasks associated with PBI 7.
 | Task ID | Name | Status | Description |
 | :------ | :--- | :----- | :---------- |
 | 7-1 | [Update DevTools config](./7-1.md) | Done | Add Enabled flag and tool-specific options to DevTools config struct |
-| 7-2 | [Implement DevTools module - Core Tools](./7-2.md) | Proposed | Install Git and build-essential (gcc, make, etc.) |
+| 7-2 | [Implement DevTools module - Core Tools](./7-2.md) | Done | Install Git and build-essential (gcc, make, etc.) |
 | 7-3 | [Implement DevTools module - Node.js via nvm](./7-3.md) | Proposed | Install nvm per-user and Node.js LTS |
 | 7-4 | [Implement DevTools module - Python and uv](./7-4.md) | Proposed | Install system Python and uv package manager |
 | 7-5 | [Implement DevTools module - Go](./7-5.md) | Proposed | Install latest stable Go from official source |
