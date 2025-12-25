@@ -1351,3 +1351,137 @@ The module does not require any configuration fields. It uses sensible defaults:
 - `bufio` - Reading config files
 - `strings` - String operations
 
+## Docker Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/docker`
+
+Implements the Docker CE and Docker Compose v2 installation module that installs Docker from the official Docker repository, configures the Docker service, and adds the configured user to the docker group. This enables containerized application deployment.
+
+### Public Types
+
+```go
+// DockerModule implements the Module interface for Docker CE and Docker Compose installation.
+type DockerModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "docker"
+func (m *DockerModule) Name() string
+
+// Description returns "Installs Docker CE and Docker Compose"
+func (m *DockerModule) Description() string
+
+// IsInstalled checks if Docker is already installed and configured.
+// Verifies that Docker is installed, Docker service is running, and Docker Compose is installed.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *DockerModule) IsInstalled() (bool, error)
+
+// Install installs Docker CE and Docker Compose v2, and adds the user to the docker group.
+// Uses cfg.User.Username (required) and cfg.Docker.InstallCompose (defaults to true).
+func (m *DockerModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/docker"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register docker module
+mod := &docker.DockerModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install Docker
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Docker: %v", err)
+        return
+    }
+    log.Success("Docker installation completed")
+} else {
+    log.Skip("Docker already installed")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.User.Username` - Username to add to docker group (required)
+- `config.Docker.InstallCompose` - Whether to verify Docker Compose installation (defaults to `true`)
+
+### Behavior
+
+- **Prerequisites**: Installs `ca-certificates` and `curl` packages before adding Docker repository.
+- **GPG Key**: Downloads Docker's official GPG key from `https://download.docker.com/linux/ubuntu/gpg` and adds it to `/usr/share/keyrings/docker-archive-keyring.gpg`.
+- **Repository Setup**: Detects distribution codename using `lsb_release -cs` or `/etc/os-release`, gets system architecture, and adds Docker repository to `/etc/apt/sources.list.d/docker.list`.
+- **Package Installation**: Installs Docker CE packages: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`.
+- **Service Configuration**: Enables and starts Docker service using `systemctl enable --now docker`. Verifies service is running after start.
+- **Docker Compose**: Verifies Docker Compose v2 installation if `cfg.Docker.InstallCompose` is true. Docker Compose v2 is installed as part of `docker-compose-plugin` package.
+- **User Group**: Checks if user exists before attempting to add to docker group. If user doesn't exist, logs a warning and skips group membership (allows Docker module to run independently). If user exists, adds user to docker group using `usermod -aG docker <username>`. Warns user that logout/login is required for group changes to take effect.
+- **Idempotency**: `IsInstalled()` checks if Docker is installed, service is running, and Docker Compose is installed. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Validates username is set before proceeding. Returns descriptive errors if GPG key download fails, repository addition fails, package installation fails, service start fails, or user group addition fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files. Still performs checks (Docker installed, etc.).
+- **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when user needs to logout/login for docker group changes, and `log.Error()` for errors.
+
+### Distribution Codename Detection
+
+The module detects the distribution codename using:
+1. `lsb_release -cs` (preferred method)
+2. `/etc/os-release` file (fallback) - reads `VERSION_CODENAME` or maps `VERSION_ID` to codename
+
+Supported Ubuntu versions: 22.04 (jammy), 20.04 (focal), 18.04 (bionic), 16.04 (xenial)
+
+### Commands Used
+
+- `apt-get update` - Update package lists
+- `apt-get install -y ca-certificates curl` - Install prerequisites
+- `curl -fsSL <url>` - Download GPG key
+- `gpg --dearmor` - Convert GPG key to keyring format
+- `lsb_release -cs` - Get distribution codename
+- `dpkg --print-architecture` - Get system architecture
+- `apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin` - Install Docker packages
+- `docker --version` - Verify Docker installation
+- `systemctl enable --now docker` - Enable and start Docker service
+- `systemctl is-active docker` - Check Docker service status
+- `docker compose version` - Verify Docker Compose installation
+- `id <username>` - Check if user exists
+- `id -nG <username>` - Check user groups
+- `usermod -aG docker <username>` - Add user to docker group
+
+### File Operations
+
+- Creates `/usr/share/keyrings/docker-archive-keyring.gpg` with GPG keyring
+- Creates `/etc/apt/sources.list.d/docker.list` with Docker repository entry
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `bufio` - Reading /etc/os-release
+- `strings` - String operations
+
