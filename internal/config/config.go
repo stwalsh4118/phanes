@@ -52,8 +52,11 @@ type Docker struct {
 
 // Postgres contains PostgreSQL configuration.
 type Postgres struct {
+	Enabled  bool   `yaml:"enabled"`
 	Version  string `yaml:"version"`
 	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+	User     string `yaml:"user"`
 }
 
 // Redis contains Redis configuration.
@@ -105,8 +108,11 @@ func DefaultConfig() *Config {
 			InstallCompose: true,
 		},
 		Postgres: Postgres{
+			Enabled:  true,
 			Version:  "16",
 			Password: "",
+			Database: "phanes",
+			User:     "phanes",
 		},
 		Redis: Redis{
 			Password: "",
