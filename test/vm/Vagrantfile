@@ -1,0 +1,78 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Simplified Vagrantfile for WSL compatibility
+# Avoids rsync (which doesn't work with password auth in WSL)
+# Files are copied manually after VM is ready
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.hostname = "phanes-test"
+  
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "phanes-test-vm"
+    vb.memory = "2048"
+    vb.cpus = 2
+  end
+  
+  # Network - forward SSH port
+  config.vm.network "forwarded_port", guest: 22, host: 2222, id: "ssh"
+  
+  # DISABLE all synced folders - we'll copy files manually
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  # Provision VM with Go and dependencies
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    echo "=== Provisioning Phanes Test VM ==="
+    
+    # Update package lists
+    apt-get update -qq
+    
+    # Install essential packages
+    apt-get install -y -qq curl git build-essential ca-certificates gnupg lsb-release
+    
+    # Install Go 1.21
+    GO_VERSION="1.21.5"
+    if [ ! -d "/usr/local/go" ]; then
+      echo "Installing Go ${GO_VERSION}..."
+      cd /tmp
+      curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o go.tar.gz
+      tar -C /usr/local -xzf go.tar.gz
+      rm go.tar.gz
+    fi
+    
+    # Add Go to PATH
+    if ! grep -q "/usr/local/go/bin" /etc/profile; then
+      echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+    fi
+    export PATH=$PATH:/usr/local/go/bin
+    go version
+    
+    # Install system dependencies for modules
+    apt-get install -y -qq ufw fail2ban openssh-server sudo locales
+    
+    # Generate locale
+    locale-gen en_US.UTF-8
+    
+    # Ensure password auth is enabled for SSH (WSL compatibility)
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    echo "vagrant:vagrant" | chpasswd
+    systemctl restart sshd || service ssh restart
+    
+    # Create workspace directory
+    mkdir -p /workspace
+    chown vagrant:vagrant /workspace
+    
+    echo "=== Provisioning complete ==="
+    echo "Go version: $(go version)"
+  SHELL
+  
+  # SSH configuration
+  config.ssh.username = "vagrant"
+  config.ssh.password = "vagrant"
+  config.ssh.insert_key = false
+  config.ssh.connect_timeout = 120
+  config.ssh.verify_host_key = :never
+end

@@ -83,3 +83,7 @@ build-errors.log
 .env.local
 .env.*.local
 
+# Vagrant VM files
+test/vm/.vagrant/
+test/vm/vagrant-*.log
+.vagrant/

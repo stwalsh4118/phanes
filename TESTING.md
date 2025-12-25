@@ -237,3 +237,177 @@ When adding new modules, add corresponding E2E tests:
 - In Docker containers, locale changes may not be active in the current shell session
 - The locale is still configured correctly in `/etc/default/locale`
 - New shells will use the configured locale
+
+## Testing in Vagrant VM (Recommended for System Modules)
+
+For testing modules that require full system capabilities (UFW, fail2ban, systemd), use a Vagrant VM. This provides a real Ubuntu environment with instant rollback via snapshots.
+
+### Prerequisites
+
+- **VirtualBox** installed ([Download](https://www.virtualbox.org/wiki/Downloads))
+- **Vagrant** installed ([Download](https://www.vagrantup.com/downloads))
+- ~4GB disk space for VM
+
+### Quick Start
+
+```bash
+# One-time setup (creates VM + snapshot, ~3 minutes)
+./scripts/test-vm.sh setup
+
+# Run security module test (restore + test, ~10 seconds)
+./scripts/test-vm.sh test security
+
+# Run all modules test
+./scripts/test-vm.sh test baseline,user,security
+
+# Interactive debugging
+./scripts/test-vm.sh shell
+
+# Check VM status
+./scripts/test-vm.sh status
+
+# Clean up when done
+./scripts/test-vm.sh destroy
+```
+
+### How It Works
+
+The VM testing uses **snapshots** for fast iteration:
+
+1. **Initial Setup**: Creates Ubuntu 22.04 VM and takes a "clean" snapshot
+2. **Each Test Run**: 
+   - Restores snapshot (~2-5 seconds)
+   - Builds phanes binary
+   - Runs specified modules
+   - VM is now "dirty" but you don't care
+3. **Next Test**: Restore snapshot again (instant clean state)
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `setup` | Create VM and take initial snapshot (one-time, ~3 min) |
+| `test [modules]` | Restore snapshot and test modules (default: baseline,user,security) |
+| `shell` | Open SSH shell in VM for manual testing |
+| `status` | Show VM and snapshot status |
+| `destroy` | Destroy VM (with confirmation) |
+
+### Testing Workflow
+
+```bash
+# 1. One-time setup
+./scripts/test-vm.sh setup
+
+# 2. Test security module (restores clean state each time)
+./scripts/test-vm.sh test security
+
+# 3. Test multiple modules
+./scripts/test-vm.sh test baseline,user,security
+
+# 4. Test with dry-run
+./scripts/test-vm.sh shell
+# Inside VM:
+cd /workspace
+sudo ./phanes --modules security --config test-config.yaml --dry-run
+
+# 5. Test with profile
+./scripts/test-vm.sh shell
+# Inside VM:
+cd /workspace
+sudo ./phanes --profile minimal --config test-config.yaml
+```
+
+### VM Configuration
+
+- **OS**: Ubuntu 22.04 LTS (jammy)
+- **Resources**: 2GB RAM, 2 CPUs
+- **Synced Folder**: Project root → `/workspace` in VM
+- **SSH Port**: Forwarded to host port 2222
+- **Pre-installed**: Go 1.21, UFW, fail2ban, SSH server, locales
+
+### Advantages Over Docker
+
+- **Full system capabilities**: UFW, fail2ban, systemd all work properly
+- **Fast iteration**: Snapshot restore takes 2-5 seconds vs 3+ minutes for VM recreation
+- **Real environment**: Matches production VPS setup exactly
+- **Persistent**: VM stays running between tests (faster than Docker container recreation)
+
+### Time Estimates
+
+| Operation | Time |
+|-----------|------|
+| Initial VM creation | ~3 minutes (one-time) |
+| Snapshot restore | 2-5 seconds |
+| Build phanes in VM | ~5 seconds |
+| Run single module | ~10-30 seconds |
+| **Total per test cycle** | **~20-40 seconds** |
+
+### Troubleshooting
+
+#### VM won't start
+- Check VirtualBox is running: `VBoxManage --version`
+- Check Vagrant is installed: `vagrant --version`
+- Try: `cd test/vm && vagrant up`
+
+#### Snapshot restore fails
+- Check snapshot exists: `cd test/vm && vagrant snapshot list`
+- If missing, recreate: `./scripts/test-vm.sh setup`
+
+#### Synced folder issues
+- Ensure VirtualBox Guest Additions are installed (should be automatic)
+- Try: `cd test/vm && vagrant reload`
+
+#### Port conflicts
+- If port 2222 is in use, edit `test/vm/Vagrantfile` and change the forwarded port
+
+#### Out of disk space
+- Destroy old VMs: `./scripts/test-vm.sh destroy`
+- Clean Vagrant cache: `vagrant box prune`
+
+### Manual VM Management
+
+If you need to manage the VM manually:
+
+```bash
+cd test/vm
+
+# Start VM
+vagrant up
+
+# Stop VM
+vagrant halt
+
+# Suspend VM
+vagrant suspend
+
+# SSH into VM
+vagrant ssh
+
+# List snapshots
+vagrant snapshot list
+
+# Create snapshot
+vagrant snapshot save my-snapshot
+
+# Restore snapshot
+vagrant snapshot restore my-snapshot
+
+# Delete snapshot
+vagrant snapshot delete my-snapshot
+
+# Destroy VM
+vagrant destroy
+```
+
+### When to Use VM vs Docker
+
+**Use VM for:**
+- Testing modules that require systemd (fail2ban, SSH service management)
+- Testing UFW firewall configuration
+- Testing modules that modify system services
+- Full end-to-end testing before deployment
+
+**Use Docker for:**
+- Quick unit/integration tests that don't need full system
+- CI/CD pipelines (faster startup)
+- Testing modules that work in containers (baseline, user)
