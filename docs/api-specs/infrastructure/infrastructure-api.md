@@ -227,9 +227,11 @@ type Caddy struct {
 
 // DevTools contains development tools configuration.
 type DevTools struct {
+    Enabled       bool   `yaml:"enabled"`
     NodeVersion   string `yaml:"node_version"`
     PythonVersion string `yaml:"python_version"`
     GoVersion     string `yaml:"go_version"`
+    InstallUv     bool   `yaml:"install_uv"`
 }
 
 // Coolify contains Coolify configuration.
@@ -292,9 +294,11 @@ defaultCfg := config.DefaultConfig()
 - **Postgres.User**: `"phanes"`
 - **Redis.Enabled**: `true`
 - **Redis.BindAddress**: `"127.0.0.1"`
-- **DevTools.NodeVersion**: `"20"`
-- **DevTools.PythonVersion**: `"3.12"`
-- **DevTools.GoVersion**: `"1.25"`
+- **DevTools.Enabled**: `true`
+- **DevTools.NodeVersion**: `"22"`
+- **DevTools.PythonVersion**: `"3"`
+- **DevTools.GoVersion**: `"1.24"`
+- **DevTools.InstallUv**: `true`
 - **Nginx.Enabled**: `true`
 - **Caddy.Enabled**: `true`
 - **Coolify.Enabled**: `true`
