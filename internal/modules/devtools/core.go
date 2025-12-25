@@ -173,4 +173,3 @@ func installCoreTools(cfg *config.Config) error {
 	log.Success("Core development tools installed successfully")
 	return nil
 }
-
