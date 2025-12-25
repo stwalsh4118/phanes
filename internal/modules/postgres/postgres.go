@@ -487,4 +487,3 @@ func (m *PostgresModule) Install(cfg *config.Config) error {
 
 // Ensure PostgresModule implements the Module interface
 var _ module.Module = (*PostgresModule)(nil)
-
