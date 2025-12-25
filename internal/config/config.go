@@ -61,7 +61,9 @@ type Postgres struct {
 
 // Redis contains Redis configuration.
 type Redis struct {
-	Password string `yaml:"password"`
+	Enabled     bool   `yaml:"enabled"`
+	Password    string `yaml:"password"`
+	BindAddress string `yaml:"bind_address"`
 }
 
 // Nginx contains Nginx configuration.
@@ -115,7 +117,9 @@ func DefaultConfig() *Config {
 			User:     "phanes",
 		},
 		Redis: Redis{
-			Password: "",
+			Enabled:     true,
+			Password:    "",
+			BindAddress: "127.0.0.1",
 		},
 		Nginx: Nginx{
 			Enabled: true,
