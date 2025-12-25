@@ -290,9 +290,11 @@ defaultCfg := config.DefaultConfig()
 - **DevTools.NodeVersion**: `"20"`
 - **DevTools.PythonVersion**: `"3.12"`
 - **DevTools.GoVersion**: `"1.25"`
-- **Nginx.Enabled**: `false`
-- **Caddy.Enabled**: `false`
-- **Coolify.Enabled**: `false`
+- **Nginx.Enabled**: `true`
+- **Caddy.Enabled**: `true`
+- **Coolify.Enabled**: `true`
+
+**Note on Module Enabled Defaults**: Modules default to `enabled: true` because when a user explicitly runs a module via `--modules`, they intend to install it. The `enabled` flag is primarily useful for disabling modules when included in profiles (e.g., `caddy: enabled: false` in a profile config to skip Caddy installation). Config files should focus on actual configuration values rather than acting as gates for module execution.
 
 ### Required Fields
 
@@ -1629,7 +1631,7 @@ func (m *NginxModule) Description() string
 func (m *NginxModule) IsInstalled() (bool, error)
 
 // Install installs and configures Nginx web server.
-// Uses cfg.Nginx.Enabled (defaults to false) - skips installation if disabled.
+// Uses cfg.Nginx.Enabled (defaults to true) - skips installation if disabled.
 func (m *NginxModule) Install(cfg *config.Config) error
 ```
 
@@ -1677,7 +1679,7 @@ if !installed {
 
 The module uses the following configuration fields:
 
-- `config.Nginx.Enabled` - Whether to install Nginx (defaults to `false`)
+- `config.Nginx.Enabled` - Whether to install Nginx (defaults to `true`)
 
 ### Behavior
 
@@ -1688,7 +1690,7 @@ The module uses the following configuration fields:
 - **Idempotency**: `IsInstalled()` checks if Nginx is installed, service is running, and port is accessible. `Install()` is fully idempotent - checks if each component is already configured before making changes.
 - **Error Handling**: Returns descriptive errors if apt update fails, nginx installation fails, service start/enable fails, or port check fails.
 - **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands. Still performs checks (Nginx installed, etc.).
-- **Configuration Flag**: Respects `cfg.Nginx.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation.
+- **Configuration Flag**: Respects `cfg.Nginx.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation. Set to `false` in config to disable the module when included in a profile.
 - **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when port conflicts are detected, and `log.Error()` for errors.
 
 ### Commands Used
@@ -1712,5 +1714,129 @@ The module uses the following configuration fields:
 - `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
 - `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
 - `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `strings` - String operations
+
+## Caddy Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/caddy`
+
+Implements the Caddy web server installation module that installs Caddy via the official apt repository, creates a default Caddyfile, configures the service, and verifies it is running and accessible on port 80. Caddy provides automatic HTTPS certificate management via Let's Encrypt.
+
+### Public Types
+
+```go
+// CaddyModule implements the Module interface for Caddy web server installation.
+type CaddyModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "caddy"
+func (m *CaddyModule) Name() string
+
+// Description returns "Installs and configures Caddy web server with automatic HTTPS"
+func (m *CaddyModule) Description() string
+
+// IsInstalled checks if Caddy is already installed and configured.
+// Verifies that Caddy is installed, service is running, and port 80 is accessible.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *CaddyModule) IsInstalled() (bool, error)
+
+// Install installs and configures Caddy web server.
+// Uses cfg.Caddy.Enabled (defaults to true) - skips installation if disabled.
+func (m *CaddyModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/caddy"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register caddy module
+mod := &caddy.CaddyModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install Caddy
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Caddy: %v", err)
+        return
+    }
+    log.Success("Caddy installation completed")
+} else {
+    log.Skip("Caddy already installed")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Caddy.Enabled` - Whether to install Caddy (defaults to `true`)
+
+### Behavior
+
+- **Repository Setup**: Adds Caddy's official apt repository by installing prerequisites (`debian-keyring`, `debian-archive-keyring`, `apt-transport-https`, `curl`), downloading and installing GPG key from `https://dl.cloudsmith.io/public/caddy/stable/gpg.key`, adding repository source from `https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt`, and updating package list.
+- **Package Installation**: Installs Caddy via apt (`apt-get install -y caddy`) from the official repository and verifies installation with `caddy version`.
+- **Caddyfile Creation**: Creates default Caddyfile at `/etc/caddy/Caddyfile` with content `localhost { respond "Caddy is running!" }` if it doesn't exist. Creates `/etc/caddy/` directory if needed.
+- **Service Configuration**: Enables Caddy service to start on boot using `systemctl enable caddy`. Starts the service if not running using `systemctl start caddy`. Verifies service is running after start.
+- **Port Verification**: Checks if Caddy is listening on port 80 using `ss -tlnp` (or `netstat -tlnp` as fallback). Logs access URL: `http://localhost` and mentions automatic HTTPS capability.
+- **Port Conflict Detection**: Before installation, checks if port 80 is already in use by another service. If so, logs a warning but proceeds with installation (user may have configured it intentionally).
+- **Idempotency**: `IsInstalled()` checks if Caddy is installed, service is running, and port is accessible. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Returns descriptive errors if GPG key download fails, repository addition fails, apt update fails, caddy installation fails, Caddyfile creation fails, service start/enable fails, or port check fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands. Still performs checks (Caddy installed, etc.).
+- **Configuration Flag**: Respects `cfg.Caddy.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation. Set to `false` in config to disable the module when included in a profile.
+- **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when port conflicts are detected, and `log.Error()` for errors. Mentions automatic HTTPS capability after successful installation.
+
+### Commands Used
+
+- `apt-get update` - Update package list
+- `apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl` - Install prerequisites
+- `curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg` - Add GPG key
+- `curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list` - Add repository
+- `apt-get install -y caddy` - Install caddy package
+- `caddy version` - Verify caddy installation
+- `systemctl enable caddy` - Enable Caddy service
+- `systemctl start caddy` - Start Caddy service
+- `systemctl is-active caddy` - Check Caddy service status
+- `systemctl is-enabled caddy` - Check if Caddy service is enabled
+- `ss -tlnp` or `netstat -tlnp` - Check if port 80 is listening
+
+### File Operations
+
+- Creates `/etc/caddy/` directory with permissions 0755 if it doesn't exist
+- Creates `/etc/caddy/Caddyfile` with default content if it doesn't exist (permissions 0644)
+- Checks for `/usr/bin/caddy` binary to verify installation
+- Creates `/usr/share/keyrings/caddy-stable-archive-keyring.gpg` with GPG keyring
+- Creates `/etc/apt/sources.list.d/caddy-stable.list` with repository entry
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
 - `strings` - String operations
 
