@@ -8,6 +8,6 @@ This document lists all tasks associated with PBI 6.
 
 | Task ID | Name | Status | Description |
 | :------ | :--- | :----- | :---------- |
-| 6-1 | [Implement PostgreSQL module](./6-1.md) | Proposed | Create module for PostgreSQL installation, database/user creation, and configuration |
+| 6-1 | [Implement PostgreSQL module](./6-1.md) | Done | Create module for PostgreSQL installation, database/user creation, and configuration |
 | 6-2 | [Implement Redis module](./6-2.md) | Proposed | Create module for Redis installation and secure configuration |
 
