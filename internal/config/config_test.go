@@ -46,14 +46,14 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.DevTools.GoVersion != "1.25" {
 		t.Errorf("Expected Go version 1.25, got %q", cfg.DevTools.GoVersion)
 	}
-	if cfg.Nginx.Enabled {
-		t.Error("Expected Nginx disabled by default")
+	if !cfg.Nginx.Enabled {
+		t.Error("Expected Nginx enabled by default")
 	}
-	if cfg.Caddy.Enabled {
-		t.Error("Expected Caddy disabled by default")
+	if !cfg.Caddy.Enabled {
+		t.Error("Expected Caddy enabled by default")
 	}
-	if cfg.Coolify.Enabled {
-		t.Error("Expected Coolify disabled by default")
+	if !cfg.Coolify.Enabled {
+		t.Error("Expected Coolify enabled by default")
 	}
 }
 

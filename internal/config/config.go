@@ -112,10 +112,10 @@ func DefaultConfig() *Config {
 			Password: "",
 		},
 		Nginx: Nginx{
-			Enabled: false,
+			Enabled: true,
 		},
 		Caddy: Caddy{
-			Enabled: false,
+			Enabled: true,
 		},
 		DevTools: DevTools{
 			NodeVersion:   "20",
@@ -123,7 +123,7 @@ func DefaultConfig() *Config {
 			GoVersion:     "1.25",
 		},
 		Coolify: Coolify{
-			Enabled: false,
+			Enabled: true,
 		},
 	}
 }
