@@ -14,6 +14,7 @@ import (
 	"github.com/stwalsh4118/phanes/internal/modules/baseline"
 	"github.com/stwalsh4118/phanes/internal/modules/security"
 	"github.com/stwalsh4118/phanes/internal/modules/swap"
+	"github.com/stwalsh4118/phanes/internal/modules/updates"
 	"github.com/stwalsh4118/phanes/internal/modules/user"
 	"github.com/stwalsh4118/phanes/internal/profile"
 	"github.com/stwalsh4118/phanes/internal/runner"
@@ -291,6 +292,7 @@ func registerAllModules() *runner.Runner {
 	r.RegisterModule(&user.UserModule{})
 	r.RegisterModule(&security.SecurityModule{})
 	r.RegisterModule(&swap.SwapModule{})
+	r.RegisterModule(&updates.UpdatesModule{})
 
 	return r
 }
