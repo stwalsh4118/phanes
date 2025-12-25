@@ -1485,3 +1485,118 @@ Supported Ubuntu versions: 22.04 (jammy), 20.04 (focal), 18.04 (bionic), 16.04 (
 - `bufio` - Reading /etc/os-release
 - `strings` - String operations
 
+## Monitoring Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/monitoring`
+
+Implements the Netdata monitoring installation module that installs and configures Netdata using the official kickstart script. Netdata provides real-time server monitoring and performance metrics accessible via web UI on port 19999.
+
+### Public Types
+
+```go
+// MonitoringModule implements the Module interface for Netdata monitoring installation.
+type MonitoringModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "monitoring"
+func (m *MonitoringModule) Name() string
+
+// Description returns "Installs and configures Netdata monitoring"
+func (m *MonitoringModule) Description() string
+
+// IsInstalled checks if Netdata is already installed and configured.
+// Verifies that Netdata is installed, service is running, and port 19999 is accessible.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *MonitoringModule) IsInstalled() (bool, error)
+
+// Install installs and configures Netdata using the official kickstart script.
+// No config fields are required - uses Netdata defaults.
+func (m *MonitoringModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/monitoring"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register monitoring module
+mod := &monitoring.MonitoringModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install Netdata
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Netdata: %v", err)
+        return
+    }
+    log.Success("Netdata installation completed")
+} else {
+    log.Skip("Netdata already installed")
+}
+```
+
+### Configuration
+
+The module does not require any configuration fields. It uses Netdata defaults:
+- Default port: 19999
+- Default installation via kickstart script
+- Service auto-starts on boot
+
+### Behavior
+
+- **Kickstart Script**: Downloads the official Netdata kickstart script from `https://get.netdata.cloud/kickstart.sh` and runs it with `--non-interactive` flag. The script handles all installation, configuration, and service setup automatically.
+- **Service Configuration**: Enables Netdata service to start on boot using `systemctl enable netdata`. Starts the service if not running using `systemctl start netdata`. Verifies service is running after start.
+- **Port Verification**: Checks if Netdata is listening on port 19999 using `ss -tlnp` (or `netstat -tlnp` as fallback). Logs access URL: `http://localhost:19999`.
+- **Idempotency**: `IsInstalled()` checks if Netdata is installed, service is running, and port is accessible. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Returns descriptive errors if kickstart script download fails, script execution fails, service start/enable fails, or port check fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or downloading files. Still performs checks (Netdata installed, etc.).
+- **Logging**: Uses `log.Info()` for progress messages (especially during kickstart script execution), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` if port is not yet accessible (service may still be starting), and `log.Error()` for errors.
+
+### Commands Used
+
+- `curl -fsSL https://get.netdata.cloud/kickstart.sh -o /tmp/netdata-kickstart.sh` - Download kickstart script
+- `chmod +x /tmp/netdata-kickstart.sh` - Make script executable
+- `bash /tmp/netdata-kickstart.sh --non-interactive` - Run kickstart script
+- `systemctl enable netdata` - Enable Netdata service
+- `systemctl start netdata` - Start Netdata service
+- `systemctl is-active netdata` - Check Netdata service status
+- `systemctl is-enabled netdata` - Check if Netdata service is enabled
+- `ss -tlnp` or `netstat -tlnp` - Check if port 19999 is listening
+
+### File Operations
+
+- Downloads `/tmp/netdata-kickstart.sh` (temporary file, cleaned up after installation)
+- Checks for `/usr/sbin/netdata` binary to verify installation
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `strings` - String operations
+
