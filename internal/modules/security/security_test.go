@@ -359,6 +359,9 @@ func TestSecurityModule_TemplateRendering(t *testing.T) {
 	if !strings.Contains(rendered, "PubkeyAuthentication yes") {
 		t.Error("Rendered SSH config should contain PubkeyAuthentication yes")
 	}
+	if !strings.Contains(rendered, "UsePAM yes") {
+		t.Error("Rendered SSH config should contain UsePAM yes (required for locked accounts)")
+	}
 
 	// Test with password auth enabled
 	templateData.AllowPasswordAuth = true

@@ -13,8 +13,15 @@ PasswordAuthentication {{if .AllowPasswordAuth}}yes{{else}}no{{end}}
 # Public key authentication
 PubkeyAuthentication yes
 
+# PAM authentication (required for account checks on Ubuntu/Debian)
+# Without this, locked accounts (no password) cannot use pubkey auth
+UsePAM yes
+
 # Disable challenge-response authentication
 ChallengeResponseAuthentication no
+
+# Disable keyboard-interactive authentication
+KbdInteractiveAuthentication no
 
 # Disable empty passwords
 PermitEmptyPasswords no
