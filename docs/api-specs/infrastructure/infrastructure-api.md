@@ -286,7 +286,12 @@ defaultCfg := config.DefaultConfig()
 - **Security.SSHPort**: `22`
 - **Security.AllowPasswordAuth**: `false`
 - **Docker.InstallCompose**: `true`
+- **Postgres.Enabled**: `true`
 - **Postgres.Version**: `"16"`
+- **Postgres.Database**: `"phanes"`
+- **Postgres.User**: `"phanes"`
+- **Redis.Enabled**: `true`
+- **Redis.BindAddress**: `"127.0.0.1"`
 - **DevTools.NodeVersion**: `"20"`
 - **DevTools.PythonVersion**: `"3.12"`
 - **DevTools.GoVersion**: `"1.25"`
@@ -1976,5 +1981,136 @@ The module uses the following configuration fields:
 - `os` - File operations and environment variables
 - `os/exec` - Command execution with environment variables
 - `bufio` - Reading /etc/os-release
+- `strings` - String operations
+
+## Redis Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/redis`
+
+Implements the Redis in-memory data store installation module that installs Redis via apt, configures bind address and password, enables and starts the service, and verifies it is running and accessible on port 6379. This provides caching and session storage capabilities for applications.
+
+### Public Types
+
+```go
+// RedisModule implements the Module interface for Redis installation.
+type RedisModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "redis"
+func (m *RedisModule) Name() string
+
+// Description returns "Installs and configures Redis in-memory data store"
+func (m *RedisModule) Description() string
+
+// IsInstalled checks if Redis is already installed and configured.
+// Verifies that Redis is installed, service is running, port 6379 is accessible, and responds to ping.
+// Note: Since IsInstalled() doesn't receive config, it performs generic checks.
+// Install() performs specific checks with config and is fully idempotent.
+func (m *RedisModule) IsInstalled() (bool, error)
+
+// Install installs and configures Redis in-memory data store.
+// Uses cfg.Redis.Enabled (defaults to true), cfg.Redis.BindAddress (defaults to "127.0.0.1"),
+// and cfg.Redis.Password (optional, empty means no password).
+func (m *RedisModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/redis"
+    "github.com/stwalsh4118/phanes/internal/config"
+    "github.com/stwalsh4118/phanes/internal/runner"
+)
+
+// Create and register redis module
+mod := &redis.RedisModule{}
+r := runner.NewRunner()
+r.RegisterModule(mod)
+
+// Load configuration
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Error("Failed to load config: %v", err)
+    return
+}
+
+// Check if already installed
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check installation status: %v", err)
+    return
+}
+
+if !installed {
+    // Install Redis
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Redis: %v", err)
+        return
+    }
+    log.Success("Redis installation completed")
+} else {
+    log.Skip("Redis already installed")
+}
+```
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Redis.Enabled` - Whether to install Redis (defaults to `true`)
+- `config.Redis.BindAddress` - Bind address for Redis (defaults to `"127.0.0.1"`)
+- `config.Redis.Password` - Password for Redis authentication (optional, empty means no password)
+
+### Behavior
+
+- **Package Installation**: Installs Redis via apt (`apt-get install -y redis-server`) from default Ubuntu repositories. Verifies installation with `redis-cli --version`.
+- **Config File Modification**: Modifies `/etc/redis/redis.conf` to configure bind address and password. Updates `bind` directive for network binding and `requirepass` directive for password authentication. When password is removed, the `requirepass` line is commented out.
+- **Bind Address Configuration**: Configures Redis to bind to specified address (defaults to `127.0.0.1` for localhost-only access). Warns if binding to all interfaces (`0.0.0.0` or `::`) without password configured.
+- **Password Configuration**: Sets password via `requirepass` directive if provided. Password is optional - if empty, the `requirepass` directive is commented out. Never logs passwords in any form.
+- **Service Configuration**: Enables Redis service to start on boot using `systemctl enable redis-server`. Starts the service if not running using `systemctl start redis-server`. Verifies service is running after start.
+- **Configuration Reload**: Reloads Redis configuration using `systemctl reload redis-server` after config changes. Falls back to restart if reload fails. Verifies service is still running after reload/restart.
+- **Port Verification**: Checks if Redis is listening on port 6379 using `ss -tlnp` (or `netstat -tlnp` as fallback). Logs connection details after successful installation (without password).
+- **Ping Verification**: Tests Redis connectivity using `redis-cli ping` (or `redis-cli -a <password> ping` if password is configured). Verifies Redis responds with "PONG".
+- **Idempotency**: `IsInstalled()` checks if Redis is installed, service is running, port is accessible, and ping responds. `Install()` is fully idempotent - checks if each component is already configured before making changes.
+- **Error Handling**: Returns descriptive errors if apt update fails, Redis installation fails, config file modification fails, service start/enable fails, config reload fails, port check fails, or ping test fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or modifying files. Still performs checks (Redis installed, etc.).
+- **Configuration Flag**: Respects `cfg.Redis.Enabled` flag. If `Enabled` is `false`, skips installation and logs skip message. If `Enabled` is `true` (default), proceeds with installation. Set to `false` in config to disable the module when included in a profile.
+- **Security Warning**: Warns if `BindAddress` is set to `0.0.0.0` or `::` (all interfaces) without password configured. This is insecure and exposes Redis to the network without authentication.
+- **Password Security**: Never logs passwords in any form. Uses secure command execution for password handling. Logs connection details without password after installation.
+- **Logging**: Uses `log.Info()` for progress messages (especially during installation), `log.Success()` for completion, `log.Skip()` for already-configured items, `log.Warn()` when binding to all interfaces without password or when port is not yet accessible, and `log.Error()` for errors. Shows connection details after successful installation.
+
+### Commands Used
+
+- `apt-get update` - Update package list
+- `apt-get install -y redis-server` - Install Redis package
+- `redis-cli --version` - Verify Redis installation
+- `systemctl enable redis-server` - Enable Redis service
+- `systemctl start redis-server` - Start Redis service
+- `systemctl reload redis-server` - Reload Redis configuration
+- `systemctl restart redis-server` - Restart Redis service (fallback if reload fails)
+- `systemctl is-active redis-server` - Check Redis service status
+- `systemctl is-enabled redis-server` - Check if Redis service is enabled
+- `redis-cli ping` - Test Redis connectivity (without password)
+- `redis-cli -a <password> ping` - Test Redis connectivity (with password)
+- `ss -tlnp` or `netstat -tlnp` - Check if port 6379 is listening
+
+### File Operations
+
+- Modifies `/etc/redis/redis.conf` to configure bind address and password
+- Checks for `/usr/bin/redis-cli` binary to verify installation
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution and file operations
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations
+- `os/exec` - Command execution
+- `bufio` - Reading Redis config file
 - `strings` - String operations
 
