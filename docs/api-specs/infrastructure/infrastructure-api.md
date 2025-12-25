@@ -1930,6 +1930,7 @@ The module uses the following configuration fields:
 - **Repository Setup**: Adds PostgreSQL's official APT repository by installing prerequisites (`wget`, `ca-certificates`), downloading GPG key from `https://www.postgresql.org/media/keys/ACCC4CF8.asc`, adding repository source, and updating package list.
 - **Package Installation**: Installs PostgreSQL via apt (`apt-get install -y postgresql-<version>`) from the official repository and verifies installation with `psql --version`.
 - **Service Configuration**: Enables PostgreSQL service to start on boot using `systemctl enable postgresql`. Starts the service if not running using `systemctl start postgresql`. Verifies service is running after start.
+- **Local Connection Configuration**: PostgreSQL's default `pg_hba.conf` configuration allows local connections via peer authentication for the postgres user, which is sufficient for local database operations. The module relies on these defaults and does not modify `pg_hba.conf`.
 - **Database Creation**: Creates initial database (from config, default "phanes") if it doesn't exist using `psql -U postgres -c "CREATE DATABASE <database>;"`.
 - **User Creation**: Creates database user (from config, default "phanes") with password if it doesn't exist using `psql -U postgres -c "CREATE USER <user> WITH PASSWORD '<password>';"`. Password is passed securely via command (not logged).
 - **Privilege Granting**: Grants all privileges on the database to the user using `psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE <database> TO <user>;"`.
