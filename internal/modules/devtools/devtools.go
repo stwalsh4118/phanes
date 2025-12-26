@@ -73,11 +73,11 @@ func (m *DevToolsModule) Install(cfg *config.Config) error {
 		return fmt.Errorf("failed to install Python: %w", err)
 	}
 
-	// TODO: Install Go (task 7-5)
-	// log.Info("Installing Go...")
-	// if err := installGo(cfg); err != nil {
-	// 	return fmt.Errorf("failed to install Go: %w", err)
-	// }
+	// Install Go
+	log.Info("Installing Go...")
+	if err := installGo(cfg); err != nil {
+		return fmt.Errorf("failed to install Go: %w", err)
+	}
 
 	log.Success("Development tools installation completed")
 	return nil
