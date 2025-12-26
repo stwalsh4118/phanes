@@ -158,10 +158,10 @@ download_and_install() {
         fi
     fi
     
-    # Extract the archive
+    # Extract the archive (strip the parent directory)
     info "Extracting archive..."
     cd "${TMP_DIR}"
-    tar -xzf "${FILENAME}"
+    tar -xzf "${FILENAME}" --strip-components=1
     
     # Make binary executable
     chmod +x "${BINARY_NAME}"
