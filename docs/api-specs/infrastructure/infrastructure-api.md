@@ -2319,6 +2319,108 @@ The module uses the following configuration fields:
 - `strconv` - String to integer conversion
 - `strings` - String operations
 
+## DevTools Module - Python and uv
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
+
+Implements helper functions for installing system Python 3 via apt and optionally uv (Python package manager) per-user. Python is installed system-wide, while uv is installed in the user's home directory (`~/.local/bin/uv`) and requires shell profile configuration.
+
+### Public Functions
+
+```go
+// installPython installs Python 3 and optionally uv for the configured user.
+// Installs Python 3 via apt and uv to ~/.local/bin/uv (if enabled).
+// Configures shell profiles (.bashrc, .zshrc) for uv PATH.
+// Uses cfg.User.Username (required for uv) and cfg.DevTools.InstallUv (defaults to true).
+// Returns an error if installation fails.
+func installPython(cfg *config.Config) error
+
+// pythonInstalled checks if Python 3 is installed.
+// Checks if python3 command exists in PATH.
+func pythonInstalled() (bool, error)
+
+// uvInstalled checks if uv is installed for a specific user.
+// Checks if ~/.local/bin/uv exists.
+func uvInstalled(username string) (bool, error)
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/devtools"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Check if Python 3 is installed
+installed, err := devtools.pythonInstalled()
+if err != nil {
+    log.Error("Failed to check Python: %v", err)
+    return
+}
+
+if !installed {
+    // Install Python 3 and uv
+    cfg := config.DefaultConfig()
+    cfg.User.Username = "myuser"
+    cfg.DevTools.InstallUv = true
+    if err := devtools.installPython(cfg); err != nil {
+        log.Error("Failed to install Python: %v", err)
+        return
+    }
+    log.Success("Python installed")
+} else {
+    log.Skip("Python 3 already installed")
+}
+```
+
+### Behavior
+
+- **Python 3 Installation**: Installs system Python 3 via apt (`apt-get install -y python3 python3-venv python3-pip`). Updates apt package list before installation. Verifies installation with `python3 --version`.
+- **uv Installation**: If `cfg.DevTools.InstallUv` is true, downloads and runs the official uv install script (`curl -LsSf https://astral.sh/uv/install.sh | sh`) as the target user. Installs to `~/.local/bin/uv`. Verifies installation with `uv --version`.
+- **Shell Profile Configuration**: Appends uv PATH export to `.bashrc` and `.zshrc` if not already present. PATH export: `export PATH="$HOME/.local/bin:$PATH"`.
+- **Installation Checks**: 
+  - `pythonInstalled()` checks if `python3` command exists in PATH
+  - `uvInstalled()` checks if `~/.local/bin/uv` file exists
+- **Idempotency**: `installPython()` checks if Python 3 and uv are already installed before installing. Returns early with `log.Skip()` if already configured.
+- **Error Handling**: Validates username is set for uv installation (warns and skips if not). Returns descriptive errors if apt update fails, Python installation fails, uv installation fails, shell profile configuration fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files.
+- **User Context**: uv installation commands run as the target user using `su - <username> -c "<command>"` to ensure proper environment and file ownership.
+- **File Ownership**: Sets correct ownership on shell profile files using `os.Chown()` with the user's UID/GID.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, `log.Skip()` when already installed, and `log.Warn()` if username is not set for uv.
+
+### Commands Used
+
+- `apt-get update` - Update apt package list
+- `apt-get install -y python3 python3-venv python3-pip` - Install Python 3 and related packages
+- `python3 --version` - Verify Python 3 installation
+- `su - <username> -c "curl -LsSf https://astral.sh/uv/install.sh | sh"` - Install uv as the user
+- `su - <username> -c "~/.local/bin/uv --version"` - Verify uv installation
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.User.Username` - Username for installing uv (required if InstallUv is true)
+- `config.DevTools.InstallUv` - Whether to install uv package manager (defaults to `true`)
+
+### Files Created/Modified
+
+- `~/.bashrc` - Shell profile with uv PATH export appended
+- `~/.zshrc` - Shell profile with uv PATH export appended
+- `~/.local/bin/uv` - uv binary (created by uv install script)
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations and ownership
+- `os/user` - User lookup for UID/GID
+- `path/filepath` - Path operations
+- `strconv` - String to integer conversion
+- `strings` - String operations
+
 ## DevTools Module - Main Orchestrator
 
 Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
@@ -2398,9 +2500,9 @@ The module uses the following configuration fields:
 
 - `config.DevTools.Enabled` - Whether to install development tools (defaults to `true`)
 - `config.DevTools.NodeVersion` - Node.js version to install (defaults to "22")
-- `config.DevTools.PythonVersion` - Python version to install (defaults to "3") [planned]
+- `config.DevTools.PythonVersion` - Python version to install (defaults to "3")
 - `config.DevTools.GoVersion` - Go version to install (defaults to "1.24") [planned]
-- `config.DevTools.InstallUv` - Whether to install uv package manager (defaults to `true`) [planned]
+- `config.DevTools.InstallUv` - Whether to install uv package manager (defaults to `true`)
 - `config.User.Username` - Required for per-user installations (nvm, etc.)
 
 ### Behavior
@@ -2408,7 +2510,7 @@ The module uses the following configuration fields:
 - **Orchestration**: Installs components in order: core tools → Node.js → Python → Go. Stops on first error.
 - **Core Tools**: Installs git, build-essential, curl, wget, ca-certificates via apt.
 - **Node.js**: Installs nvm per-user in `~/.nvm`, then installs specified Node.js version.
-- **Python**: [Planned] Installs system Python and optionally uv package manager.
+- **Python**: Installs system Python 3 via apt and optionally uv package manager per-user.
 - **Go**: [Planned] Installs Go from official source.
 - **Enabled Flag**: Respects `cfg.DevTools.Enabled` - if false, skips installation with `log.Skip()`.
 - **Idempotency**: Each sub-component checks if already installed before installing.
@@ -2422,7 +2524,7 @@ The module uses the following configuration fields:
 |-----------|--------|-------------|
 | Core Tools | ✅ Implemented | git, build-essential, curl, wget, ca-certificates |
 | Node.js/nvm | ✅ Implemented | nvm + Node.js LTS per-user |
-| Python/uv | 🔲 Planned | System Python + uv package manager |
+| Python/uv | ✅ Implemented | System Python + uv package manager |
 | Go | 🔲 Planned | Go from official source |
 
 ### Dependencies
