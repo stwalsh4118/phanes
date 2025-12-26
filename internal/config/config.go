@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,8 +19,9 @@ type Config struct {
 	Redis    Redis    `yaml:"redis"`
 	Nginx    Nginx    `yaml:"nginx"`
 	Caddy    Caddy    `yaml:"caddy"`
-	DevTools DevTools `yaml:"devtools"`
-	Coolify  Coolify  `yaml:"coolify"`
+	DevTools  DevTools  `yaml:"devtools"`
+	Coolify   Coolify   `yaml:"coolify"`
+	Tailscale Tailscale `yaml:"tailscale"`
 }
 
 // User contains user-related configuration.
@@ -115,6 +117,14 @@ type Coolify struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+// Tailscale contains Tailscale VPN configuration.
+type Tailscale struct {
+	// Enabled determines whether to install and configure Tailscale.
+	Enabled bool `yaml:"enabled"`
+	// AuthKey is the Tailscale auth key for authentication (must start with "tskey-").
+	AuthKey string `yaml:"auth_key"`
+}
+
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
@@ -164,6 +174,10 @@ func DefaultConfig() *Config {
 		Coolify: Coolify{
 			Enabled: true,
 		},
+		Tailscale: Tailscale{
+			Enabled: false,
+			AuthKey: "",
+		},
 	}
 }
 
@@ -200,6 +214,15 @@ func Validate(cfg *Config) error {
 
 	if cfg.User.SSHPublicKey == "" {
 		return fmt.Errorf("user.ssh_public_key is required")
+	}
+
+	if cfg.Tailscale.Enabled {
+		if cfg.Tailscale.AuthKey == "" {
+			return fmt.Errorf("tailscale.auth_key is required when tailscale is enabled")
+		}
+		if !strings.HasPrefix(cfg.Tailscale.AuthKey, "tskey-") {
+			return fmt.Errorf("tailscale.auth_key must start with 'tskey-'")
+		}
 	}
 
 	return nil
