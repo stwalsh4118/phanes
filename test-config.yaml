@@ -1,5 +1,0 @@
-user:
-  username: "sean"
-  ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAFFmdSOzAzu92yXjlKoB9NEvFLq7ubY/csOD6zamt9j sean@seanspc"
-system:
-  timezone: "UTC"

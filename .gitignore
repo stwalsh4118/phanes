@@ -65,6 +65,7 @@ $RECYCLE.BIN/
 
 # Configuration files (user-specific)
 config.yaml
+test-config.yaml
 !config.yaml.example
 
 # Test artifacts
