@@ -15,7 +15,7 @@ Phanes is a VPS provisioning system for Linux servers. It provides a modular, id
 
 1. **Install Phanes**:
    ```bash
-   go install github.com/stwalsh4118/phanes@latest
+   curl -fsSL https://raw.githubusercontent.com/stwalsh4118/phanes/main/scripts/install.sh | sh
    ```
 
 2. **Create a configuration file** (`config.yaml`):
@@ -36,6 +36,26 @@ That's it! Phanes will provision your server with the selected profile's modules
 
 ## Installation
 
+### One-Line Install (Recommended)
+
+Install the latest release without requiring Go:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stwalsh4118/phanes/main/scripts/install.sh | sh
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stwalsh4118/phanes/main/scripts/install.sh | sh -s -- --version v0.1.0
+```
+
+Install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stwalsh4118/phanes/main/scripts/install.sh | sh -s -- --install-dir ~/.local/bin
+```
+
 ### From Source
 
 ```bash
@@ -53,9 +73,9 @@ go install github.com/stwalsh4118/phanes@latest
 
 ### Requirements
 
-- Go 1.21 or later (for building from source)
 - Linux-based operating system (Ubuntu/Debian recommended)
 - Root or sudo access for provisioning operations
+- **For building from source**: Go 1.21 or later
 
 ## Usage
 
