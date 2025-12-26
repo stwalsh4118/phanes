@@ -96,9 +96,12 @@ func TestRunModules_EmptyList(t *testing.T) {
 	r := NewRunner()
 	cfg := config.DefaultConfig()
 
-	err := r.RunModules([]string{}, cfg, false)
+	results, err := r.RunModules([]string{}, cfg, false)
 	if err == nil {
 		t.Fatal("Expected error for empty module list")
+	}
+	if results != nil {
+		t.Fatal("Expected nil results for empty module list")
 	}
 }
 
@@ -106,9 +109,15 @@ func TestRunModules_UnknownModule(t *testing.T) {
 	r := NewRunner()
 	cfg := config.DefaultConfig()
 
-	err := r.RunModules([]string{"unknown"}, cfg, false)
+	results, err := r.RunModules([]string{"unknown"}, cfg, false)
 	if err == nil {
 		t.Fatal("Expected error for unknown module")
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusError {
+		t.Fatalf("Expected StatusError, got %s", results[0].Status)
 	}
 }
 
@@ -123,9 +132,18 @@ func TestRunModules_Success(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, false)
+	results, err := r.RunModules([]string{"test"}, cfg, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusInstalled {
+		t.Fatalf("Expected StatusInstalled, got %s", results[0].Status)
+	}
+	if results[0].Name != "test" {
+		t.Fatalf("Expected name 'test', got %s", results[0].Name)
 	}
 }
 
@@ -140,9 +158,15 @@ func TestRunModules_SkipInstalled(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, false)
+	results, err := r.RunModules([]string{"test"}, cfg, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusSkipped {
+		t.Fatalf("Expected StatusSkipped, got %s", results[0].Status)
 	}
 }
 
@@ -158,9 +182,18 @@ func TestRunModules_InstallError(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, false)
+	results, err := r.RunModules([]string{"test"}, cfg, false)
 	if err == nil {
 		t.Fatal("Expected error for failed installation")
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusFailed {
+		t.Fatalf("Expected StatusFailed, got %s", results[0].Status)
+	}
+	if results[0].Error == nil {
+		t.Fatal("Expected error to be set")
 	}
 }
 
@@ -176,9 +209,18 @@ func TestRunModules_IsInstalledError(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, false)
+	results, err := r.RunModules([]string{"test"}, cfg, false)
 	if err == nil {
 		t.Fatal("Expected error for failed IsInstalled check")
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusError {
+		t.Fatalf("Expected StatusError, got %s", results[0].Status)
+	}
+	if results[0].Error == nil {
+		t.Fatal("Expected error to be set")
 	}
 }
 
@@ -193,9 +235,15 @@ func TestRunModules_DryRun(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, true)
+	results, err := r.RunModules([]string{"test"}, cfg, true)
 	if err != nil {
 		t.Fatalf("Expected no error in dry-run mode, got: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusWouldInstall {
+		t.Fatalf("Expected StatusWouldInstall in dry-run, got %s", results[0].Status)
 	}
 
 	// Verify Install was not called (installErr would be set if it was)
@@ -214,9 +262,15 @@ func TestRunModules_DryRunInstalled(t *testing.T) {
 	r.RegisterModule(mod)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"test"}, cfg, true)
+	results, err := r.RunModules([]string{"test"}, cfg, true)
 	if err != nil {
 		t.Fatalf("Expected no error in dry-run mode, got: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusSkipped {
+		t.Fatalf("Expected StatusSkipped in dry-run, got %s", results[0].Status)
 	}
 }
 
@@ -238,9 +292,15 @@ func TestRunModules_MultipleModules(t *testing.T) {
 	r.RegisterModule(mod2)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"module1", "module2"}, cfg, false)
+	results, err := r.RunModules([]string{"module1", "module2"}, cfg, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 results, got %d", len(results))
+	}
+	if results[0].Status != StatusInstalled || results[1].Status != StatusInstalled {
+		t.Fatal("Expected both modules to be installed")
 	}
 }
 
@@ -262,9 +322,18 @@ func TestRunModules_MultipleModulesWithError(t *testing.T) {
 	r.RegisterModule(mod2)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"module1", "module2"}, cfg, false)
+	results, err := r.RunModules([]string{"module1", "module2"}, cfg, false)
 	if err == nil {
 		t.Fatal("Expected error when one module fails")
+	}
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 results, got %d", len(results))
+	}
+	if results[0].Status != StatusInstalled {
+		t.Fatalf("Expected module1 to be installed, got %s", results[0].Status)
+	}
+	if results[1].Status != StatusFailed {
+		t.Fatalf("Expected module2 to be failed, got %s", results[1].Status)
 	}
 }
 
@@ -286,9 +355,26 @@ func TestRunModules_MixedInstalledAndNotInstalled(t *testing.T) {
 	r.RegisterModule(mod2)
 
 	cfg := config.DefaultConfig()
-	err := r.RunModules([]string{"installed", "notinstalled"}, cfg, false)
+	results, err := r.RunModules([]string{"installed", "notinstalled"}, cfg, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 results, got %d", len(results))
+	}
+	// Order may vary, so check both
+	skippedFound := false
+	installedFound := false
+	for _, result := range results {
+		if result.Name == "installed" && result.Status == StatusSkipped {
+			skippedFound = true
+		}
+		if result.Name == "notinstalled" && result.Status == StatusInstalled {
+			installedFound = true
+		}
+	}
+	if !skippedFound || !installedFound {
+		t.Fatal("Expected one skipped and one installed module")
 	}
 }
 
