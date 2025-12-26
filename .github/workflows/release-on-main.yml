@@ -1,0 +1,129 @@
+name: Release on Main
+
+# This workflow creates a release on every push to main
+# It uses the short commit SHA as the version for dev releases
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Generate version
+        id: version
+        run: |
+          # Use date + short SHA for dev releases
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date +%Y%m%d)
+          VERSION="dev-${DATE}-${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=dev-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build Linux amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist/phanes_${VERSION}_linux_amd64
+          go build -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o dist/phanes_${VERSION}_linux_amd64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_linux_amd64.tar.gz phanes_${VERSION}_linux_amd64
+          rm -rf phanes_${VERSION}_linux_amd64
+
+      - name: Build Linux arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist/phanes_${VERSION}_linux_arm64
+          go build -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o dist/phanes_${VERSION}_linux_arm64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_linux_arm64.tar.gz phanes_${VERSION}_linux_arm64
+          rm -rf phanes_${VERSION}_linux_arm64
+
+      - name: Build macOS amd64
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist/phanes_${VERSION}_darwin_amd64
+          go build -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o dist/phanes_${VERSION}_darwin_amd64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_darwin_amd64.tar.gz phanes_${VERSION}_darwin_amd64
+          rm -rf phanes_${VERSION}_darwin_amd64
+
+      - name: Build macOS arm64 (Apple Silicon)
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist/phanes_${VERSION}_darwin_arm64
+          go build -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o dist/phanes_${VERSION}_darwin_arm64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_darwin_arm64.tar.gz phanes_${VERSION}_darwin_arm64
+          rm -rf phanes_${VERSION}_darwin_arm64
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Delete old dev releases
+        run: |
+          # Keep only the latest 5 dev releases to avoid cluttering
+          gh release list --limit 100 | grep "dev-" | tail -n +6 | awk '{print $1}' | while read tag; do
+            echo "Deleting old release: $tag"
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Development Build ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: true
+          body: |
+            Automated development build from commit ${{ github.sha }}
+            
+            **Commit:** ${{ github.event.head_commit.message }}
+            
+            This is a pre-release development build. For stable releases, use version tags (e.g., v0.1.0).
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

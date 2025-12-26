@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build Linux amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          VERSION=${{ steps.version.outputs.version_number }}
+          mkdir -p dist/phanes_${VERSION}_linux_amd64
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }}" \
+            -o dist/phanes_${VERSION}_linux_amd64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_linux_amd64.tar.gz phanes_${VERSION}_linux_amd64
+          rm -rf phanes_${VERSION}_linux_amd64
+
+      - name: Build Linux arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+        run: |
+          VERSION=${{ steps.version.outputs.version_number }}
+          mkdir -p dist/phanes_${VERSION}_linux_arm64
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }}" \
+            -o dist/phanes_${VERSION}_linux_arm64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_linux_arm64.tar.gz phanes_${VERSION}_linux_arm64
+          rm -rf phanes_${VERSION}_linux_arm64
+
+      - name: Build macOS amd64
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+        run: |
+          VERSION=${{ steps.version.outputs.version_number }}
+          mkdir -p dist/phanes_${VERSION}_darwin_amd64
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }}" \
+            -o dist/phanes_${VERSION}_darwin_amd64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_darwin_amd64.tar.gz phanes_${VERSION}_darwin_amd64
+          rm -rf phanes_${VERSION}_darwin_amd64
+
+      - name: Build macOS arm64 (Apple Silicon)
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          VERSION=${{ steps.version.outputs.version_number }}
+          mkdir -p dist/phanes_${VERSION}_darwin_arm64
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }}" \
+            -o dist/phanes_${VERSION}_darwin_arm64/phanes .
+          cd dist && tar -czvf phanes_${VERSION}_darwin_arm64.tar.gz phanes_${VERSION}_darwin_arm64
+          rm -rf phanes_${VERSION}_darwin_arm64
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
