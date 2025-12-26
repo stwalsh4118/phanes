@@ -2,6 +2,8 @@
 
 Last Updated: 2025-01-27
 
+**Note**: Updated with execution summary functionality (PBI 10). Runner now returns execution results and provides summary display.
+
 **Note**: All packages now include comprehensive package-level documentation (doc.go files) and enhanced field-level documentation. See individual package documentation with `go doc` for complete details.
 
 ## Logging Package
@@ -599,6 +601,44 @@ type Runner struct {
     // modules is a map of module names to Module instances
     modules map[string]module.Module
 }
+
+// ModuleStatus represents the execution status of a module.
+type ModuleStatus string
+
+const (
+    // StatusInstalled indicates the module was successfully installed.
+    StatusInstalled ModuleStatus = "installed"
+    
+    // StatusSkipped indicates the module was skipped because it was already installed.
+    StatusSkipped ModuleStatus = "skipped"
+    
+    // StatusFailed indicates the module installation failed.
+    StatusFailed ModuleStatus = "failed"
+    
+    // StatusError indicates an error occurred during module check or execution.
+    StatusError ModuleStatus = "error"
+    
+    // StatusWouldInstall indicates the module would be installed in dry-run mode.
+    // This status is only used when dry-run is enabled and the module is not currently installed.
+    StatusWouldInstall ModuleStatus = "would_install"
+)
+
+// ModuleResult represents the execution result of a single module.
+type ModuleResult struct {
+    // Name is the unique name identifier of the module.
+    Name string
+    
+    // Status indicates the execution outcome of the module.
+    Status ModuleStatus
+    
+    // Error contains error details if Status is StatusFailed or StatusError.
+    // This field is nil for successful or skipped modules.
+    Error error
+    
+    // Duration is the time taken to execute the module (optional).
+    // This field may be zero if duration tracking is not implemented.
+    Duration time.Duration
+}
 ```
 
 ### Public Functions
@@ -615,8 +655,15 @@ func (r *Runner) RegisterModule(mod module.Module)
 // RunModules executes the specified modules in order.
 // It checks IsInstalled() before calling Install() to ensure idempotency.
 // If dryRun is true, it logs what would happen without actually executing Install().
-// Returns an error if any module fails to execute or if a module name is not found.
-func (r *Runner) RunModules(names []string, cfg *config.Config, dryRun bool) error
+// Returns a slice of ModuleResult for each module processed and an error if any module fails.
+func (r *Runner) RunModules(names []string, cfg *config.Config, dryRun bool) ([]ModuleResult, error)
+
+// PrintSummary displays a formatted summary table of module execution results.
+// The table shows each module's name, status, and error details (if any).
+// Status indicators are color-coded: green for installed/would install, yellow for skipped, red for failed/error.
+// A summary line shows total counts for each status.
+// If dryRun is true, a dry-run indicator is displayed.
+func PrintSummary(results []ModuleResult, dryRun bool)
 
 // GetModule returns a module from the registry by name.
 // Returns nil if the module is not found.
@@ -654,16 +701,20 @@ if err != nil {
 
 // Execute modules
 moduleNames := []string{"baseline", "docker"}
-err = r.RunModules(moduleNames, cfg, false)
+results, err := r.RunModules(moduleNames, cfg, false)
 if err != nil {
     log.Error("Failed to execute modules: %v", err)
 }
+// Print execution summary
+runner.PrintSummary(results, false)
 
 // Dry-run mode
-err = r.RunModules(moduleNames, cfg, true)
+results, err = r.RunModules(moduleNames, cfg, true)
 if err != nil {
     log.Error("Dry-run failed: %v", err)
 }
+// Print dry-run summary
+runner.PrintSummary(results, true)
 
 // List all registered modules
 modules := r.ListModules()
@@ -680,7 +731,9 @@ if mod != nil {
 
 - **Idempotency**: The runner checks `IsInstalled()` before calling `Install()` for each module. If a module is already installed, it is skipped with a log message using `log.Skip()`.
 - **Error Handling**: Errors from `IsInstalled()` or `Install()` are logged using `log.Error()` and collected. The runner continues processing remaining modules even if one fails, but returns an error at the end if any modules failed.
-- **Dry-Run Mode**: When `dryRun` is true, the runner checks `IsInstalled()` but does not call `Install()`. It logs what would happen without making changes. Uses `log.Skip()` for already-installed modules and `log.Info()` for modules that would be installed.
+- **Dry-Run Mode**: When `dryRun` is true, the runner checks `IsInstalled()` but does not call `Install()`. It logs what would happen without making changes. Uses `log.Skip()` for already-installed modules and `log.Info()` for modules that would be installed. Modules that would be installed are marked with `StatusWouldInstall` (not `StatusInstalled`) to distinguish them from actually installed modules.
+- **Result Collection**: `RunModules()` returns a slice of `ModuleResult` for each module processed, allowing callers to display execution summaries. Results include status, error details (if any), and optional duration tracking.
+- **Summary Display**: `PrintSummary()` provides a formatted table showing module execution results with color-coded status indicators and totals. Works in both normal and dry-run modes.
 - **Module Registry**: Modules are registered by their name (from `Module.Name()`). Duplicate registrations overwrite the previous module with a warning logged using `log.Warn()`.
 - **Order**: Modules are executed in the order specified in the `names` slice.
 - **Unknown Modules**: If a module name is not found in the registry, an error is logged using `log.Error()` and the runner continues with the next module.
@@ -697,7 +750,22 @@ if mod != nil {
 - **Unknown Module**: Returns an error if a module name is not found in the registry.
 - **IsInstalled Error**: If `IsInstalled()` returns an error, it is logged and the module is skipped.
 - **Install Error**: If `Install()` returns an error, it is logged and collected. The runner continues with remaining modules.
-- **Multiple Errors**: If multiple modules fail, all errors are collected and returned together.
+- **Multiple Errors**: If multiple modules fail, all errors are collected and returned together. Results are still returned even when errors occur, allowing summary display.
+
+### Summary Display
+
+The `PrintSummary()` function displays execution results in a formatted table:
+
+- **Table Format**: Box-drawing characters with columns for Module, Status, and Details
+- **Status Indicators**: 
+  - `✓ Installed` (green) - Module successfully installed
+  - `→ Would Install` (green) - Module would be installed in dry-run mode
+  - `⊘ Skipped` (yellow) - Module already installed, skipped
+  - `✗ Failed` (red) - Module installation failed
+  - `✗ Error` (red) - Error during module check or execution
+- **Error Details**: Failed/error modules show error messages in the Details column (truncated to 50 chars)
+- **Totals**: Summary line shows counts: "X installed, Y would install, Z skipped, W failed"
+- **Dry-Run Indicator**: Summary includes "(dry-run)" suffix when in dry-run mode
 
 ### Dependencies
 
