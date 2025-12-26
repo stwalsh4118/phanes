@@ -127,3 +127,22 @@ coolify:
   # Note: Requires Docker to be installed first
   enabled: true
 
+# Tailscale Configuration
+tailscale:
+  # Enable Tailscale VPN installation
+  # Default: false
+  enabled: false
+  
+  # Tailscale auth key for authentication
+  # Required when enabled is true and skip_auth is false
+  # Get your auth key from: https://login.tailscale.com/admin/settings/keys
+  # Must start with "tskey-"
+  # Example: "tskey-auth-..."
+  auth_key: ""
+  
+  # Skip automatic authentication (allows manual login)
+  # Default: false
+  # When true, the module will install Tailscale but skip automatic authentication
+  # You can then manually run "tailscale up" to authenticate via browser
+  skip_auth: false
+

@@ -22,6 +22,7 @@ import (
 	"github.com/stwalsh4118/phanes/internal/modules/redis"
 	"github.com/stwalsh4118/phanes/internal/modules/security"
 	"github.com/stwalsh4118/phanes/internal/modules/swap"
+	"github.com/stwalsh4118/phanes/internal/modules/tailscale"
 	"github.com/stwalsh4118/phanes/internal/modules/updates"
 	"github.com/stwalsh4118/phanes/internal/modules/user"
 	"github.com/stwalsh4118/phanes/internal/profile"
@@ -306,6 +307,7 @@ func registerAllModules() *runner.Runner {
 	r.RegisterModule(&nginx.NginxModule{})
 	r.RegisterModule(&caddy.CaddyModule{})
 	r.RegisterModule(&coolify.CoolifyModule{})
+	r.RegisterModule(&tailscale.TailscaleModule{})
 	r.RegisterModule(&postgres.PostgresModule{})
 	r.RegisterModule(&redis.RedisModule{})
 	r.RegisterModule(&devtools.DevToolsModule{})

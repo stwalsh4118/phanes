@@ -279,7 +279,12 @@ type Tailscale struct {
     // Enabled determines whether to install and configure Tailscale.
     Enabled bool `yaml:"enabled"`
     // AuthKey is the Tailscale auth key for authentication (must start with "tskey-").
+    // Required unless SkipAuth is true.
     AuthKey string `yaml:"auth_key"`
+    // SkipAuth allows manual authentication after installation.
+    // When true, the module will install Tailscale but skip automatic authentication,
+    // allowing you to manually run "tailscale up" to authenticate via browser.
+    SkipAuth bool `yaml:"skip_auth"`
 }
 ```
 
@@ -347,6 +352,7 @@ defaultCfg := config.DefaultConfig()
 - **Coolify.Enabled**: `true`
 - **Tailscale.Enabled**: `false`
 - **Tailscale.AuthKey**: `""`
+- **Tailscale.SkipAuth**: `false`
 
 **Note on Module Enabled Defaults**: Modules default to `enabled: true` because when a user explicitly runs a module via `--modules`, they intend to install it. The `enabled` flag is primarily useful for disabling modules when included in profiles (e.g., `caddy: enabled: false` in a profile config to skip Caddy installation). Config files should focus on actual configuration values rather than acting as gates for module execution.
 
@@ -357,7 +363,7 @@ defaultCfg := config.DefaultConfig()
 
 ### Conditional Validation
 
-- `tailscale.auth_key` - Required when `tailscale.enabled` is `true`. Must start with `"tskey-"`
+- `tailscale.auth_key` - Required when `tailscale.enabled` is `true` and `tailscale.skip_auth` is `false`. Must start with `"tskey-"`
 
 ### Behavior
 
