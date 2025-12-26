@@ -2,6 +2,8 @@
 
 Last Updated: 2025-01-27
 
+**Note**: All packages now include comprehensive package-level documentation (doc.go files) and enhanced field-level documentation. See individual package documentation with `go doc` for complete details.
+
 ## Logging Package
 
 Package: `github.com/stwalsh4118/phanes/internal/log`
@@ -177,65 +179,95 @@ type Config struct {
 }
 
 // User contains user-related configuration.
+// Both fields are required for the user module to function.
 type User struct {
-    Username     string `yaml:"username"`
+    // Username is the Linux username to create on the server.
+    Username string `yaml:"username"`
+    // SSHPublicKey is the SSH public key to add to the user's authorized_keys file.
     SSHPublicKey string `yaml:"ssh_public_key"`
 }
 
 // System contains system-level configuration.
 type System struct {
+    // Timezone is the system timezone (e.g., "UTC", "America/New_York").
     Timezone string `yaml:"timezone"`
 }
 
 // Swap contains swap file configuration.
 type Swap struct {
-    Enabled bool   `yaml:"enabled"`
-    Size    string `yaml:"size"`
+    // Enabled determines whether to create a swap file.
+    Enabled bool `yaml:"enabled"`
+    // Size is the swap file size (e.g., "1G", "2G", "4G").
+    Size string `yaml:"size"`
 }
 
 // Security contains security-related configuration.
 type Security struct {
-    SSHPort           int  `yaml:"ssh_port"`
+    // SSHPort is the port number for SSH (1-65535).
+    SSHPort int `yaml:"ssh_port"`
+    // AllowPasswordAuth enables password authentication for SSH (not recommended).
     AllowPasswordAuth bool `yaml:"allow_password_auth"`
 }
 
 // Docker contains Docker-related configuration.
 type Docker struct {
+    // InstallCompose determines whether to install Docker Compose alongside Docker CE.
     InstallCompose bool `yaml:"install_compose"`
 }
 
 // Postgres contains PostgreSQL configuration.
 type Postgres struct {
-    Version  string `yaml:"version"`
+    // Enabled determines whether to install PostgreSQL.
+    Enabled bool `yaml:"enabled"`
+    // Version is the PostgreSQL version to install (e.g., "16", "15").
+    Version string `yaml:"version"`
+    // Password is the PostgreSQL superuser password (empty for no password).
     Password string `yaml:"password"`
+    // Database is the initial database name to create.
+    Database string `yaml:"database"`
+    // User is the PostgreSQL user name.
+    User string `yaml:"user"`
 }
 
 // Redis contains Redis configuration.
 type Redis struct {
+    // Enabled determines whether to install Redis.
+    Enabled bool `yaml:"enabled"`
+    // Password is the Redis password (empty for no password).
     Password string `yaml:"password"`
+    // BindAddress is the IP address Redis should bind to (e.g., "127.0.0.1", "0.0.0.0").
+    BindAddress string `yaml:"bind_address"`
 }
 
 // Nginx contains Nginx configuration.
 type Nginx struct {
+    // Enabled determines whether to install Nginx.
     Enabled bool `yaml:"enabled"`
 }
 
 // Caddy contains Caddy configuration.
 type Caddy struct {
+    // Enabled determines whether to install Caddy.
     Enabled bool `yaml:"enabled"`
 }
 
 // DevTools contains development tools configuration.
 type DevTools struct {
-    Enabled       bool   `yaml:"enabled"`
-    NodeVersion   string `yaml:"node_version"`
+    // Enabled determines whether to install development tools.
+    Enabled bool `yaml:"enabled"`
+    // NodeVersion is the Node.js version to install via nvm (e.g., "22", "20").
+    NodeVersion string `yaml:"node_version"`
+    // PythonVersion is the Python version to install (e.g., "3", "3.11").
     PythonVersion string `yaml:"python_version"`
-    GoVersion     string `yaml:"go_version"`
-    InstallUv     bool   `yaml:"install_uv"`
+    // GoVersion is the Go version to install (e.g., "1.25.5").
+    GoVersion string `yaml:"go_version"`
+    // InstallUv determines whether to install the uv package manager for Python.
+    InstallUv bool `yaml:"install_uv"`
 }
 
 // Coolify contains Coolify configuration.
 type Coolify struct {
+    // Enabled determines whether to install Coolify (requires Docker).
     Enabled bool `yaml:"enabled"`
 }
 ```
