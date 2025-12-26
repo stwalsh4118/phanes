@@ -176,8 +176,9 @@ type Config struct {
     Redis    Redis    `yaml:"redis"`
     Nginx    Nginx    `yaml:"nginx"`
     Caddy    Caddy    `yaml:"caddy"`
-    DevTools DevTools `yaml:"devtools"`
-    Coolify  Coolify  `yaml:"coolify"`
+    DevTools  DevTools  `yaml:"devtools"`
+    Coolify   Coolify   `yaml:"coolify"`
+    Tailscale Tailscale `yaml:"tailscale"`
 }
 
 // User contains user-related configuration.
@@ -272,6 +273,14 @@ type Coolify struct {
     // Enabled determines whether to install Coolify (requires Docker).
     Enabled bool `yaml:"enabled"`
 }
+
+// Tailscale contains Tailscale VPN configuration.
+type Tailscale struct {
+    // Enabled determines whether to install and configure Tailscale.
+    Enabled bool `yaml:"enabled"`
+    // AuthKey is the Tailscale auth key for authentication (must start with "tskey-").
+    AuthKey string `yaml:"auth_key"`
+}
 ```
 
 ### Public Functions
@@ -336,6 +345,8 @@ defaultCfg := config.DefaultConfig()
 - **Nginx.Enabled**: `true`
 - **Caddy.Enabled**: `true`
 - **Coolify.Enabled**: `true`
+- **Tailscale.Enabled**: `false`
+- **Tailscale.AuthKey**: `""`
 
 **Note on Module Enabled Defaults**: Modules default to `enabled: true` because when a user explicitly runs a module via `--modules`, they intend to install it. The `enabled` flag is primarily useful for disabling modules when included in profiles (e.g., `caddy: enabled: false` in a profile config to skip Caddy installation). Config files should focus on actual configuration values rather than acting as gates for module execution.
 
@@ -343,6 +354,10 @@ defaultCfg := config.DefaultConfig()
 
 - `user.username` - Username for the deployment user
 - `user.ssh_public_key` - SSH public key for the deployment user
+
+### Conditional Validation
+
+- `tailscale.auth_key` - Required when `tailscale.enabled` is `true`. Must start with `"tskey-"`
 
 ### Behavior
 
