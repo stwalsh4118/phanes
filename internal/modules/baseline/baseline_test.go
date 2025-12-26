@@ -193,7 +193,6 @@ func TestBaselineModule_Install_ErrorHandling(t *testing.T) {
 
 	// We can't easily test error handling without mocking exec,
 	// but we can verify the function signature and that it accepts config
-	if cfg == nil {
-		t.Error("Config should not be nil")
-	}
+	// Config is created above, so it's guaranteed to be non-nil
+	_ = cfg // Use cfg to avoid unused variable warning
 }

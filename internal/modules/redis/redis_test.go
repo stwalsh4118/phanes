@@ -153,9 +153,12 @@ func TestRedisModule_Install_BindAllInterfacesWithoutPassword(t *testing.T) {
 	// Should warn but not error when binding to all interfaces without password
 	err := mod.Install(cfg)
 	// Error is expected if Redis is not installed, but warning should be logged
-	if err != nil && !strings.Contains(err.Error(), "Warning") {
-		// The warning is logged but doesn't cause an error
-		// We're just checking that it doesn't panic
+	// The warning is logged but doesn't cause an error
+	// We're just checking that it doesn't panic
+	if err != nil {
+		// Errors are acceptable (e.g., Redis not installed, permission denied)
+		// The important thing is that the warning is logged and it doesn't panic
+		_ = err
 	}
 }
 
