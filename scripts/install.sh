@@ -106,20 +106,19 @@ detect_arch() {
 
 # Get latest release version from GitHub
 get_latest_version() {
-    info "Fetching latest version..."
-    
+    # Note: Do not use info/warn here - this function's stdout is captured
     # Try using curl first, then wget
     if command -v curl >/dev/null 2>&1; then
         VERSION=$(curl -sL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     elif command -v wget >/dev/null 2>&1; then
         VERSION=$(wget -qO- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     else
-        error "Neither curl nor wget found. Please install one of them."
+        echo "ERROR: Neither curl nor wget found" >&2
         exit 1
     fi
     
     if [ -z "${VERSION}" ]; then
-        error "Failed to fetch latest version. Check your internet connection or specify a version with --version"
+        echo "ERROR: Failed to fetch latest version" >&2
         exit 1
     fi
     
@@ -250,6 +249,7 @@ main() {
     
     # Get version if not specified
     if [ -z "${VERSION}" ]; then
+        info "Fetching latest version..."
         VERSION=$(get_latest_version)
     fi
     info "Version to install: ${VERSION}"
