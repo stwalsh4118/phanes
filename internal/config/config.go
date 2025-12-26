@@ -10,15 +10,15 @@ import (
 
 // Config represents the complete configuration structure for Phanes.
 type Config struct {
-	User     User     `yaml:"user"`
-	System   System   `yaml:"system"`
-	Swap     Swap     `yaml:"swap"`
-	Security Security `yaml:"security"`
-	Docker   Docker   `yaml:"docker"`
-	Postgres Postgres `yaml:"postgres"`
-	Redis    Redis    `yaml:"redis"`
-	Nginx    Nginx    `yaml:"nginx"`
-	Caddy    Caddy    `yaml:"caddy"`
+	User      User      `yaml:"user"`
+	System    System    `yaml:"system"`
+	Swap      Swap      `yaml:"swap"`
+	Security  Security  `yaml:"security"`
+	Docker    Docker    `yaml:"docker"`
+	Postgres  Postgres  `yaml:"postgres"`
+	Redis     Redis     `yaml:"redis"`
+	Nginx     Nginx     `yaml:"nginx"`
+	Caddy     Caddy     `yaml:"caddy"`
 	DevTools  DevTools  `yaml:"devtools"`
 	Coolify   Coolify   `yaml:"coolify"`
 	Tailscale Tailscale `yaml:"tailscale"`
@@ -122,7 +122,12 @@ type Tailscale struct {
 	// Enabled determines whether to install and configure Tailscale.
 	Enabled bool `yaml:"enabled"`
 	// AuthKey is the Tailscale auth key for authentication (must start with "tskey-").
+	// Required unless SkipAuth is true.
 	AuthKey string `yaml:"auth_key"`
+	// SkipAuth allows manual authentication after installation.
+	// When true, the module will install Tailscale but skip automatic authentication,
+	// allowing you to manually run "tailscale up" to authenticate via browser.
+	SkipAuth bool `yaml:"skip_auth"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -175,8 +180,9 @@ func DefaultConfig() *Config {
 			Enabled: true,
 		},
 		Tailscale: Tailscale{
-			Enabled: false,
-			AuthKey: "",
+			Enabled:  false,
+			AuthKey:  "",
+			SkipAuth: false,
 		},
 	}
 }
@@ -217,11 +223,13 @@ func Validate(cfg *Config) error {
 	}
 
 	if cfg.Tailscale.Enabled {
-		if cfg.Tailscale.AuthKey == "" {
-			return fmt.Errorf("tailscale.auth_key is required when tailscale is enabled")
-		}
-		if !strings.HasPrefix(cfg.Tailscale.AuthKey, "tskey-") {
-			return fmt.Errorf("tailscale.auth_key must start with 'tskey-'")
+		if !cfg.Tailscale.SkipAuth {
+			if cfg.Tailscale.AuthKey == "" {
+				return fmt.Errorf("tailscale.auth_key is required when tailscale is enabled and skip_auth is false")
+			}
+			if !strings.HasPrefix(cfg.Tailscale.AuthKey, "tskey-") {
+				return fmt.Errorf("tailscale.auth_key must start with 'tskey-'")
+			}
 		}
 	}
 
