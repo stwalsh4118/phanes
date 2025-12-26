@@ -46,8 +46,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.DevTools.PythonVersion != "3" {
 		t.Errorf("Expected Python version 3, got %q", cfg.DevTools.PythonVersion)
 	}
-	if cfg.DevTools.GoVersion != "1.24" {
-		t.Errorf("Expected Go version 1.24, got %q", cfg.DevTools.GoVersion)
+	if cfg.DevTools.GoVersion != "1.25.5" {
+		t.Errorf("Expected Go version 1.25.5, got %q", cfg.DevTools.GoVersion)
 	}
 	if !cfg.DevTools.InstallUv {
 		t.Error("Expected InstallUv enabled by default")
