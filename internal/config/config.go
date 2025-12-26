@@ -133,7 +133,7 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			NodeVersion:   "22",
 			PythonVersion: "3",
-			GoVersion:     "1.24",
+			GoVersion:     "1.25.5",
 			InstallUv:     true,
 		},
 		Coolify: Coolify{
