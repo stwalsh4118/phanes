@@ -67,11 +67,11 @@ func (m *DevToolsModule) Install(cfg *config.Config) error {
 		return fmt.Errorf("failed to install Node.js: %w", err)
 	}
 
-	// TODO: Install Python and uv (task 7-4)
-	// log.Info("Installing Python and uv...")
-	// if err := installPython(cfg); err != nil {
-	// 	return fmt.Errorf("failed to install Python: %w", err)
-	// }
+	// Install Python and uv
+	log.Info("Installing Python and uv...")
+	if err := installPython(cfg); err != nil {
+		return fmt.Errorf("failed to install Python: %w", err)
+	}
 
 	// TODO: Install Go (task 7-5)
 	// log.Info("Installing Go...")
