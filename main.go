@@ -13,6 +13,7 @@ import (
 	"github.com/stwalsh4118/phanes/internal/log"
 	"github.com/stwalsh4118/phanes/internal/modules/baseline"
 	"github.com/stwalsh4118/phanes/internal/modules/caddy"
+	"github.com/stwalsh4118/phanes/internal/modules/coolify"
 	"github.com/stwalsh4118/phanes/internal/modules/devtools"
 	"github.com/stwalsh4118/phanes/internal/modules/docker"
 	"github.com/stwalsh4118/phanes/internal/modules/monitoring"
@@ -304,6 +305,7 @@ func registerAllModules() *runner.Runner {
 	r.RegisterModule(&monitoring.MonitoringModule{})
 	r.RegisterModule(&nginx.NginxModule{})
 	r.RegisterModule(&caddy.CaddyModule{})
+	r.RegisterModule(&coolify.CoolifyModule{})
 	r.RegisterModule(&postgres.PostgresModule{})
 	r.RegisterModule(&redis.RedisModule{})
 	r.RegisterModule(&devtools.DevToolsModule{})
