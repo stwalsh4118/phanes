@@ -6,7 +6,10 @@ param(
     [string]$Command = "help",
     
     [Parameter(Position=1)]
-    [string]$Modules = "baseline,user,security"
+    [string]$Modules = "baseline,user,security",
+    
+    [Parameter()]
+    [string]$Profile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -100,9 +103,7 @@ function Invoke-SshCommand {
 }
 
 function Invoke-Test {
-    param([string]$ModuleList)
-    
-    Write-Info "Testing modules: $ModuleList"
+    param([string]$ModuleList, [string]$ProfileName)
     
     Set-Location $VmDir
     
@@ -133,9 +134,21 @@ function Invoke-Test {
     Write-Info "Building phanes in VM..."
     Invoke-SshCommand "cd /workspace && export PATH=`$PATH:/usr/local/go/bin && go build -o phanes ."
     
-    # Run phanes with specified modules
-    Write-Info "Running phanes with modules: $ModuleList"
-    Invoke-SshCommand "cd /workspace && sudo ./phanes --modules $ModuleList --config test-config.yaml"
+    # Build phanes command with either profile or modules
+    $phanesCmd = "cd /workspace && sudo ./phanes --config test-config.yaml"
+    
+    if ($ProfileName -and $ProfileName -ne "") {
+        Write-Info "Running phanes with profile: $ProfileName"
+        $phanesCmd += " --profile $ProfileName"
+    } elseif ($ModuleList -and $ModuleList -ne "") {
+        Write-Info "Running phanes with modules: $ModuleList"
+        $phanesCmd += " --modules $ModuleList"
+    } else {
+        Write-Err "Either --profile or --modules must be specified"
+        exit 1
+    }
+    
+    Invoke-SshCommand $phanesCmd
     
     Write-Success "Test complete!"
     Write-Info "Run 'test-vm.ps1 test' again to restore clean state and test again."
@@ -226,24 +239,29 @@ function Show-Help {
     Write-Host ""
     Write-Host "Commands:"
     Write-Host "  setup              Create VM and initial clean snapshot"
-    Write-Host "  test [modules]     Restore snapshot and test modules (default: baseline,user,security)"
+    Write-Host "  test [modules]      Restore snapshot and test modules (default: baseline,user,security)"
     Write-Host "  shell              Open SSH shell in VM"
     Write-Host "  sync               Sync project files to VM"
     Write-Host "  status             Show VM status"
     Write-Host "  destroy            Destroy VM and all snapshots"
     Write-Host ""
+    Write-Host "Options:"
+    Write-Host "  -Profile <name>    Run a profile instead of modules (e.g., dev, web, database)"
+    Write-Host ""
     Write-Host "Examples:"
-    Write-Host "  .\test-vm.ps1 setup                    # Initial setup"
-    Write-Host "  .\test-vm.ps1 test                     # Test default modules"
-    Write-Host "  .\test-vm.ps1 test baseline            # Test specific module"
-    Write-Host "  .\test-vm.ps1 test baseline,user       # Test multiple modules"
-    Write-Host "  .\test-vm.ps1 shell                    # Open shell for manual testing"
+    Write-Host "  .\test-vm.ps1 setup                           # Initial setup"
+    Write-Host "  .\test-vm.ps1 test                             # Test default modules"
+    Write-Host "  .\test-vm.ps1 test baseline                    # Test specific module"
+    Write-Host "  .\test-vm.ps1 test baseline,user               # Test multiple modules"
+    Write-Host "  .\test-vm.ps1 test -Profile dev               # Test dev profile"
+    Write-Host "  .\test-vm.ps1 test -Profile web               # Test web profile"
+    Write-Host "  .\test-vm.ps1 shell                           # Open shell for manual testing"
 }
 
 # Main
 switch ($Command.ToLower()) {
     "setup"   { Invoke-Setup }
-    "test"    { Invoke-Test -ModuleList $Modules }
+    "test"    { Invoke-Test -ModuleList $Modules -ProfileName $Profile }
     "shell"   { Invoke-Shell }
     "sync"    { Invoke-Sync }
     "status"  { Invoke-Status }
