@@ -14,5 +14,5 @@ This document lists all tasks associated with PBI 7.
 | 7-4 | [Implement DevTools module - Python and uv](./7-4.md) | Done | Install system Python and uv package manager |
 | 7-5 | [Implement DevTools module - Go](./7-5.md) | Done | Install latest stable Go from official source |
 | 7-6 | [Integrate DevTools module](./7-6.md) | Done | Create orchestrating DevTools module that runs all sub-components |
-| 7-7 | [Implement Coolify module](./7-7.md) | Proposed | Install Coolify with Docker dependency validation |
+| 7-7 | [Implement Coolify module](./7-7.md) | Done | Install Coolify with Docker dependency validation |
 
