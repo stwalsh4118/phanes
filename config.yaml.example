@@ -1,0 +1,129 @@
+# Phanes Configuration File Example
+# This file demonstrates all available configuration options for Phanes modules.
+# Copy this file to config.yaml and customize it for your needs.
+
+# User Configuration
+# Required: These fields must be set for user module to work
+user:
+  # Username to create on the server
+  # Required: Must be a valid Linux username
+  username: "your-username"
+  
+  # SSH public key to add to the user's authorized_keys
+  # Required: Must be a valid SSH public key (e.g., ssh-ed25519, ssh-rsa)
+  # Example: "ssh-ed25519 AAAAAC3NzaC1lZDI1NTE5AAAAI..."
+  ssh_public_key: "ssh-ed25519 AAAAAC3NzaC1lZDI1NTE5AAAAI..."
+
+# System Configuration
+system:
+  # System timezone (e.g., "UTC", "America/New_York", "Europe/London")
+  # Default: "UTC"
+  timezone: "UTC"
+
+# Swap File Configuration
+swap:
+  # Enable swap file creation
+  # Default: true
+  enabled: true
+  
+  # Swap file size (e.g., "1G", "2G", "4G")
+  # Default: "2G"
+  size: "2G"
+
+# Security Configuration
+security:
+  # SSH port number (1-65535)
+  # Default: 22
+  # Note: Changing this requires updating firewall rules
+  ssh_port: 22
+  
+  # Allow password authentication for SSH
+  # Default: false (recommended: use SSH keys only)
+  allow_password_auth: false
+
+# Docker Configuration
+docker:
+  # Install Docker Compose alongside Docker CE
+  # Default: true
+  install_compose: true
+
+# PostgreSQL Configuration
+postgres:
+  # Enable PostgreSQL installation
+  # Default: true
+  enabled: true
+  
+  # PostgreSQL version to install (e.g., "16", "15", "14")
+  # Default: "16"
+  version: "16"
+  
+  # PostgreSQL superuser password
+  # Default: "" (empty - set this for production!)
+  # Warning: Leave empty only for development/testing
+  password: ""
+  
+  # Initial database name to create
+  # Default: "phanes"
+  database: "phanes"
+  
+  # PostgreSQL user name
+  # Default: "phanes"
+  user: "phanes"
+
+# Redis Configuration
+redis:
+  # Enable Redis installation
+  # Default: true
+  enabled: true
+  
+  # Redis password (leave empty for no password)
+  # Default: "" (no password)
+  # Warning: Set a password for production use
+  password: ""
+  
+  # IP address Redis should bind to
+  # Default: "127.0.0.1" (localhost only)
+  # Use "0.0.0.0" to allow remote connections (not recommended without password)
+  bind_address: "127.0.0.1"
+
+# Nginx Configuration
+nginx:
+  # Enable Nginx installation
+  # Default: true
+  enabled: true
+
+# Caddy Configuration
+caddy:
+  # Enable Caddy installation
+  # Default: true
+  enabled: true
+
+# Development Tools Configuration
+devtools:
+  # Enable development tools installation
+  # Default: true
+  enabled: true
+  
+  # Node.js version to install via nvm (e.g., "22", "20", "18")
+  # Default: "22" (LTS)
+  node_version: "22"
+  
+  # Python version to install (e.g., "3", "3.11", "3.12")
+  # Default: "3" (system default)
+  python_version: "3"
+  
+  # Go version to install (e.g., "1.25.5", "1.24.0")
+  # Default: "1.25.5"
+  go_version: "1.25.5"
+  
+  # Install uv package manager for Python
+  # Default: true
+  install_uv: true
+
+# Coolify Configuration
+coolify:
+  # Enable Coolify installation
+  # Default: true
+  # Note: Requires Docker to be installed first
+  enabled: true
+
