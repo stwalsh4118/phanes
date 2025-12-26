@@ -352,7 +352,8 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 
 	// Execute modules
 	log.Info("Starting module execution...")
-	if err := r.RunModules(moduleNames, cfg, dryRun); err != nil {
+	results, err := r.RunModules(moduleNames, cfg, dryRun)
+	if err != nil {
 		errStr := err.Error()
 
 		// Check for unknown module errors
@@ -367,6 +368,8 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 			log.Error("Available modules: %s", strings.Join(availableModules, ", "))
 			log.Error("Use --list to see all available modules and profiles.")
 
+			// Print summary even on error
+			runner.PrintSummary(results, dryRun)
 			return fmt.Errorf("module execution failed: %w", err)
 		}
 
@@ -375,13 +378,21 @@ func executeModules(moduleNames []string, cfg *config.Config, dryRun bool) error
 			log.Error("Module execution failed")
 			log.Error("Error details: %v", err)
 			log.Error("Check the error messages above for details about which module failed.")
+
+			// Print summary even on error
+			runner.PrintSummary(results, dryRun)
 			return fmt.Errorf("module execution failed: %w", err)
 		}
 
 		// Generic error fallback
 		log.Error("Module execution failed: %v", err)
+		// Print summary even on error
+		runner.PrintSummary(results, dryRun)
 		return fmt.Errorf("module execution failed: %w", err)
 	}
+
+	// Print summary after successful execution
+	runner.PrintSummary(results, dryRun)
 
 	return nil
 }
