@@ -1849,6 +1849,121 @@ The module uses the following configuration fields:
 - `os` - File operations
 - `strings` - String operations
 
+## Coolify Module
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/coolify`
+
+Implements the Coolify module that installs Coolify, a self-hosted PaaS platform. Coolify requires Docker to be installed and running before installation can proceed.
+
+### Public Types
+
+```go
+// CoolifyModule implements the Module interface for Coolify installation.
+type CoolifyModule struct{}
+```
+
+### Module Interface Implementation
+
+```go
+// Name returns "coolify"
+func (m *CoolifyModule) Name() string
+
+// Description returns "Installs and configures Coolify self-hosted PaaS"
+func (m *CoolifyModule) Description() string
+
+// IsInstalled checks if Coolify is already installed and running.
+// Checks Docker dependency and Coolify containers.
+func (m *CoolifyModule) IsInstalled() (bool, error)
+
+// Install installs Coolify using the official install script.
+// Requires Docker to be installed and running.
+func (m *CoolifyModule) Install(cfg *config.Config) error
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/coolify"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Check if Coolify is installed
+mod := &coolify.CoolifyModule{}
+installed, err := mod.IsInstalled()
+if err != nil {
+    log.Error("Failed to check Coolify installation: %v", err)
+    return
+}
+
+if !installed {
+    // Install Coolify
+    cfg := config.DefaultConfig()
+    cfg.Coolify.Enabled = true
+    if err := mod.Install(cfg); err != nil {
+        log.Error("Failed to install Coolify: %v", err)
+        return
+    }
+    log.Success("Coolify installed")
+} else {
+    log.Skip("Coolify already installed")
+}
+```
+
+### Behavior
+
+- **Docker Dependency**: Checks that Docker is installed (`docker --version`) and running (`systemctl is-active docker`) before proceeding. Returns error if Docker is not available.
+- **Installation**: Uses official Coolify install script (`curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`). Script handles Docker Compose setup and configuration automatically.
+- **Verification**: After installation, verifies Coolify containers are running by checking `docker ps` output for containers with "coolify" in their names.
+- **Enabled Flag**: Respects `cfg.Coolify.Enabled` - if false, skips installation with `log.Skip()`.
+- **Idempotency**: `IsInstalled()` checks Docker dependency and Coolify containers. `Install()` checks if already installed before installing.
+- **Error Handling**: Returns descriptive errors if Docker dependency check fails, installation script fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, `log.Skip()` when disabled or already installed, `log.Warn()` if Docker is not available.
+
+### Commands Used
+
+- `docker --version` - Verify Docker is installed
+- `systemctl is-active docker` - Verify Docker service is running
+- `docker ps --format '{{.Names}}'` - List container names to check for Coolify containers
+- `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash` - Install Coolify using official script
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.Coolify.Enabled` - Whether to install Coolify (defaults to `true`)
+
+### Web Interface
+
+Coolify provides a web-based dashboard accessible on **port 8000** by default. After installation:
+
+1. **Access URL**: `http://localhost:8000` (or `http://<server-ip>:8000` for remote servers)
+2. **First Visit**: Create an admin account on first access
+3. **Vagrant Setup**: For Vagrant VMs, port forwarding must be configured:
+   ```ruby
+   config.vm.network "forwarded_port", guest: 8000, host: 8000, id: "coolify"
+   ```
+   Then reload the VM: `vagrant reload`
+
+### Files Created/Modified
+
+Coolify installation script creates:
+- Docker Compose configuration files (location depends on Coolify installation)
+- Coolify containers and volumes
+
+### Dependencies
+
+**Runtime Dependencies:**
+- **Docker**: Requires Docker to be installed and running. The Docker module should be run before the Coolify module.
+
+**Code Dependencies:**
+- `github.com/stwalsh4118/phanes/internal/module` - Module interface
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `strings` - String operations
+
 ## PostgreSQL Module
 
 Package: `github.com/stwalsh4118/phanes/internal/modules/postgres`
