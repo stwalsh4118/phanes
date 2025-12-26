@@ -297,7 +297,7 @@ defaultCfg := config.DefaultConfig()
 - **DevTools.Enabled**: `true`
 - **DevTools.NodeVersion**: `"22"`
 - **DevTools.PythonVersion**: `"3"`
-- **DevTools.GoVersion**: `"1.24"`
+- **DevTools.GoVersion**: `"1.25.5"`
 - **DevTools.InstallUv**: `true`
 - **Nginx.Enabled**: `true`
 - **Caddy.Enabled**: `true`
@@ -2421,6 +2421,120 @@ The module uses the following configuration fields:
 - `strconv` - String to integer conversion
 - `strings` - String operations
 
+## DevTools Module - Go
+
+Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
+
+Implements helper functions for installing Go from the official source. Go is downloaded as a tarball, extracted to `/usr/local/go`, and PATH is configured in user shell profiles.
+
+### Public Functions
+
+```go
+// installGo installs Go from the official source.
+// Downloads tarball, extracts to /usr/local/go, and configures shell profiles.
+// Uses cfg.DevTools.GoVersion (defaults to "1.25.5") and cfg.User.Username (required for shell profile config).
+// Returns an error if installation fails.
+func installGo(cfg *config.Config) error
+
+// goInstalled checks if Go is installed and matches the requested version.
+// Checks if go command exists and version matches.
+func goInstalled(version string) (bool, error)
+
+// getSystemArch detects the system architecture.
+// Uses dpkg --print-architecture with fallback to uname -m.
+func getSystemArch() (string, error)
+
+// mapArchToGoArch maps system architecture to Go architecture name.
+func mapArchToGoArch(arch string) string
+```
+
+### Usage Examples
+
+```go
+import (
+    "github.com/stwalsh4118/phanes/internal/modules/devtools"
+    "github.com/stwalsh4118/phanes/internal/config"
+)
+
+// Check if Go is installed
+installed, err := devtools.goInstalled("1.25.5")
+if err != nil {
+    log.Error("Failed to check Go: %v", err)
+    return
+}
+
+if !installed {
+    // Install Go
+    cfg := config.DefaultConfig()
+    cfg.User.Username = "myuser"
+    cfg.DevTools.GoVersion = "1.25.5"
+    if err := devtools.installGo(cfg); err != nil {
+        log.Error("Failed to install Go: %v", err)
+        return
+    }
+    log.Success("Go installed")
+} else {
+    log.Skip("Go already installed")
+}
+```
+
+### Behavior
+
+- **Architecture Detection**: Detects system architecture using `dpkg --print-architecture` (preferred) or `uname -m` (fallback). Maps system architecture to Go architecture (amd64, arm64, armv6l, 386).
+- **Go Installation**: Downloads Go tarball from `https://go.dev/dl/go<version>.linux-<arch>.tar.gz`. Removes existing installation at `/usr/local/go` if present. Extracts tarball to `/usr/local`. Verifies installation with `go version`.
+- **Shell Profile Configuration**: Appends Go PATH export to `.bashrc` and `.zshrc` if not already present. PATH export: `export PATH=$PATH:/usr/local/go/bin` and `export GOROOT=/usr/local/go`.
+- **Installation Checks**: 
+  - `goInstalled()` checks if `go` command exists in PATH and version matches
+  - Checks if `/usr/local/go/bin` directory exists
+- **Idempotency**: `installGo()` checks if Go is already installed with the correct version before installing. Returns early with `log.Skip()` if already configured.
+- **Error Handling**: Validates username is set for shell profile configuration (warns and skips if not). Returns descriptive errors if architecture detection fails, download fails, extraction fails, shell profile configuration fails, or verification fails.
+- **Dry-Run Support**: Checks dry-run mode using `log.IsDryRun()` and logs what would be done without executing commands or writing files.
+- **File Ownership**: Sets correct ownership on shell profile files using `os.Chown()` with the user's UID/GID.
+- **Logging**: Uses `log.Info()` for progress messages, `log.Success()` for completion, `log.Skip()` when already installed, and `log.Warn()` if username is not set for shell profile configuration.
+
+### Commands Used
+
+- `dpkg --print-architecture` - Get system architecture (preferred)
+- `uname -m` - Get system architecture (fallback)
+- `curl -L -o <path> <url>` - Download Go tarball
+- `rm -rf /usr/local/go` - Remove old Go installation
+- `tar -C /usr/local -xzf <tarball>` - Extract Go tarball
+- `go version` - Verify Go installation
+
+### Configuration
+
+The module uses the following configuration fields:
+
+- `config.DevTools.GoVersion` - Go version to install (defaults to `"1.25.5"`) - must include patch number
+- `config.User.Username` - Username for shell profile configuration (required for PATH setup)
+
+### Files Created/Modified
+
+- `/usr/local/go` - Go installation directory (extracted from tarball)
+- `~/.bashrc` - Shell profile with Go PATH export appended
+- `~/.zshrc` - Shell profile with Go PATH export appended
+- `/tmp/go<version>.linux-<arch>.tar.gz` - Temporary tarball (downloaded and removed)
+
+### Architecture Mapping
+
+| System Arch | Go Arch |
+|-------------|---------|
+| amd64, x86_64 | amd64 |
+| arm64, aarch64 | arm64 |
+| armv6l, armhf | armv6l |
+| 386, i386, i686 | 386 |
+
+### Dependencies
+
+- `github.com/stwalsh4118/phanes/internal/config` - Configuration structure
+- `github.com/stwalsh4118/phanes/internal/exec` - Command execution
+- `github.com/stwalsh4118/phanes/internal/log` - Logging functions
+- `os` - File operations and ownership
+- `os/user` - User lookup for UID/GID
+- `path/filepath` - Path operations
+- `strconv` - String to integer conversion
+- `strings` - String operations
+
 ## DevTools Module - Main Orchestrator
 
 Package: `github.com/stwalsh4118/phanes/internal/modules/devtools`
@@ -2501,7 +2615,7 @@ The module uses the following configuration fields:
 - `config.DevTools.Enabled` - Whether to install development tools (defaults to `true`)
 - `config.DevTools.NodeVersion` - Node.js version to install (defaults to "22")
 - `config.DevTools.PythonVersion` - Python version to install (defaults to "3")
-- `config.DevTools.GoVersion` - Go version to install (defaults to "1.24") [planned]
+- `config.DevTools.GoVersion` - Go version to install (defaults to "1.25.5")
 - `config.DevTools.InstallUv` - Whether to install uv package manager (defaults to `true`)
 - `config.User.Username` - Required for per-user installations (nvm, etc.)
 
@@ -2511,7 +2625,7 @@ The module uses the following configuration fields:
 - **Core Tools**: Installs git, build-essential, curl, wget, ca-certificates via apt.
 - **Node.js**: Installs nvm per-user in `~/.nvm`, then installs specified Node.js version.
 - **Python**: Installs system Python 3 via apt and optionally uv package manager per-user.
-- **Go**: [Planned] Installs Go from official source.
+- **Go**: Installs Go from official source by downloading tarball and extracting to `/usr/local/go`.
 - **Enabled Flag**: Respects `cfg.DevTools.Enabled` - if false, skips installation with `log.Skip()`.
 - **Idempotency**: Each sub-component checks if already installed before installing.
 - **Error Handling**: Returns descriptive errors indicating which component failed.
@@ -2525,7 +2639,7 @@ The module uses the following configuration fields:
 | Core Tools | ✅ Implemented | git, build-essential, curl, wget, ca-certificates |
 | Node.js/nvm | ✅ Implemented | nvm + Node.js LTS per-user |
 | Python/uv | ✅ Implemented | System Python + uv package manager |
-| Go | 🔲 Planned | Go from official source |
+| Go | ✅ Implemented | Go from official source |
 
 ### Dependencies
 

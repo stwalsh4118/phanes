@@ -22,7 +22,7 @@ const (
 const (
 	packagePython3     = "python3"
 	packagePython3Venv = "python3-venv"
-	packagePython3Pip = "python3-pip"
+	packagePython3Pip  = "python3-pip"
 )
 
 // uvPathScript returns the PATH export script that should be added to shell profiles for uv.
@@ -270,4 +270,3 @@ func installPython(cfg *config.Config) error {
 
 	return nil
 }
-
