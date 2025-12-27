@@ -247,3 +247,4 @@ func (m *MonitoringModule) Install(cfg *config.Config) error {
 // Ensure MonitoringModule implements the Module interface
 var _ module.Module = (*MonitoringModule)(nil)
 
+

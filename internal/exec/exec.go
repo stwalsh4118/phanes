@@ -47,3 +47,4 @@ func FileExists(path string) bool {
 func WriteFile(path string, content []byte, perm os.FileMode) error {
 	return os.WriteFile(path, content, perm)
 }
+

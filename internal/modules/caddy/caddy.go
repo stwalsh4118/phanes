@@ -364,3 +364,4 @@ func (m *CaddyModule) Install(cfg *config.Config) error {
 // Ensure CaddyModule implements the Module interface
 var _ module.Module = (*CaddyModule)(nil)
 
+

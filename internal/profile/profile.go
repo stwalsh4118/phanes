@@ -107,3 +107,4 @@ func ProfileExists(name string) bool {
 	_, exists := profiles[name]
 	return exists
 }
+

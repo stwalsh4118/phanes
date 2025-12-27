@@ -288,3 +288,4 @@ func (m *NginxModule) Install(cfg *config.Config) error {
 var _ module.Module = (*NginxModule)(nil)
 
 
+

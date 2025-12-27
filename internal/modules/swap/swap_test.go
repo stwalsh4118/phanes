@@ -409,3 +409,4 @@ func TestFstabContainsSwap_EdgeCases(t *testing.T) {
 		t.Fatalf("Failed to create test fstab: %v", err)
 	}
 }
+

@@ -12,3 +12,4 @@ This document lists all tasks associated with PBI 9.
 | 9-2 | [Create config.yaml.example](./9-2.md) | Proposed | Create example configuration file with all options documented |
 | 9-3 | [Add inline code documentation](./9-3.md) | Proposed | Add godoc comments to all public functions, types, and packages |
 
+
